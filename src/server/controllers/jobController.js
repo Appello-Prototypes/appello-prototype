@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Job = require('../models/Job');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
@@ -23,22 +24,25 @@ const jobController = {
       if (projectId) filter.projectId = projectId;
       
       // Simplified query - only populate essential fields for list view
+      // Use lean for faster queries and handle populate errors gracefully
       const jobs = await Job.find(filter)
         .populate('jobManager', 'name')
         .populate('projectId', 'name projectNumber')
         .select('name jobNumber client.name status startDate endDate contractValue overallProgress createdAt projectId')
         .sort({ createdAt: -1 })
-        .lean(); // Use lean for faster queries
+        .lean() // Use lean for faster queries
+        .maxTimeMS(10000); // 10 second timeout
       
       res.json({
         success: true,
         data: jobs
       });
     } catch (error) {
+      console.error('Error in getAllJobs:', error);
       res.status(500).json({
         success: false,
         message: 'Error fetching jobs',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   },
@@ -46,11 +50,21 @@ const jobController = {
   // GET /api/jobs/:id
   getJobById: async (req, res) => {
     try {
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job ID format'
+        });
+      }
+
       const job = await Job.findById(req.params.id)
         .populate('jobManager', 'name email phone')
         .populate('projectId', 'name projectNumber')
         .populate('fieldSupervisor', 'name email phone')
-        .populate('foremen', 'name email phone');
+        .populate('foremen', 'name email phone')
+        .maxTimeMS(10000) // 10 second timeout
+        .lean(); // Use lean() for faster queries
 
       if (!job) {
         return res.status(404).json({
@@ -64,10 +78,18 @@ const jobController = {
         data: job
       });
     } catch (error) {
+      console.error('Error in getJobById:', error);
+      // Handle specific MongoDB errors
+      if (error.name === 'CastError') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job ID format'
+        });
+      }
       res.status(500).json({
         success: false,
         message: 'Error fetching job',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   },
@@ -420,16 +442,31 @@ const jobController = {
     try {
       const { id } = req.params;
 
-      // Get all SOV components for the job
+      // Get all SOV components for the job with timeouts and optimized populates
+      // Limit populate fields to only what's needed
       const [systems, areas, phases, modules, components, sovLineItems] = await Promise.all([
-        System.find({ jobId: id }).sort({ sortOrder: 1, code: 1 }),
-        Area.find({ jobId: id }).sort({ sortOrder: 1, code: 1 }),
-        Phase.find({ jobId: id }).sort({ sortOrder: 1, code: 1 }),
-        Module.find({ jobId: id }).populate('systemId').sort({ sortOrder: 1, code: 1 }),
-        Component.find({ jobId: id }).populate('moduleId').sort({ sortOrder: 1, code: 1 }),
+        System.find({ jobId: id }).sort({ sortOrder: 1, code: 1 }).maxTimeMS(10000).lean(),
+        Area.find({ jobId: id }).sort({ sortOrder: 1, code: 1 }).maxTimeMS(10000).lean(),
+        Phase.find({ jobId: id }).sort({ sortOrder: 1, code: 1 }).maxTimeMS(10000).lean(),
+        Module.find({ jobId: id })
+          .populate('systemId', 'name code')
+          .sort({ sortOrder: 1, code: 1 })
+          .maxTimeMS(10000)
+          .lean(),
+        Component.find({ jobId: id })
+          .populate('moduleId', 'name code')
+          .sort({ sortOrder: 1, code: 1 })
+          .maxTimeMS(10000)
+          .lean(),
         ScheduleOfValues.find({ jobId: id })
-          .populate(['systemId', 'areaId', 'phaseId', 'moduleId', 'componentId'])
+          .populate('systemId', 'name code')
+          .populate('areaId', 'name code')
+          .populate('phaseId', 'name code')
+          .populate('moduleId', 'name code')
+          .populate('componentId', 'name code')
           .sort({ sortOrder: 1, lineNumber: 1 })
+          .maxTimeMS(10000)
+          .lean()
       ]);
 
       res.json({
@@ -482,7 +519,7 @@ const jobController = {
         if (filters.assignedTo) query = query.where('assignedTo').in(filters.assignedTo);
       }
 
-      // Execute query with population
+      // Execute query with population and timeout
       const tasks = await query
         .populate('assignedTo', 'name email initials')
         .populate('createdBy', 'name')
@@ -492,7 +529,9 @@ const jobController = {
         .populate('moduleId', 'name code')
         .populate('componentId', 'name code')
         .populate('scheduleOfValuesId')
-        .sort({ dueDate: 1, priority: -1, createdAt: -1 });
+        .sort({ dueDate: 1, priority: -1, createdAt: -1 })
+        .maxTimeMS(10000) // 10 second timeout
+        .lean(); // Use lean() for faster queries
 
       let responseData = tasks;
 

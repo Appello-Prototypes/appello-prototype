@@ -9,7 +9,8 @@ const getBaseURL = () => {
     console.log('🚀 Production API URL:', url);
     return url;
   }
-  // Development fallback
+  // Development: Use direct connection to backend (CORS is configured)
+  // This is more reliable than relying on Vite proxy
   const devUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   console.log('🛠️ Development API URL:', devUrl);
   return devUrl;
@@ -19,35 +20,59 @@ const baseURL = getBaseURL();
 console.log('📡 Final API Base URL:', baseURL);
 
 export const api = axios.create({
-  baseURL: baseURL,
+  baseURL: baseURL || undefined, // Use undefined instead of empty string for better axios handling
   timeout: 30000, // Increased timeout for Atlas connections
   headers: {
     'Content-Type': 'application/json',
   },
+  // Ensure requests work with Vite proxy
+  withCredentials: false,
 })
 
-// Request interceptor - simplified for demo
+// Request interceptor - with logging for debugging
 api.interceptors.request.use(
   (config) => {
+    // Log request details in development
+    if (import.meta.env.DEV) {
+      const fullURL = config.baseURL 
+        ? `${config.baseURL}${config.url}` 
+        : config.url;
+      console.log(`🔵 API Request: ${config.method?.toUpperCase()} ${fullURL}`);
+    }
     return config
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error)
   }
 )
 
-// Response interceptor - simplified for demo
+// Response interceptor - enhanced error logging
 api.interceptors.response.use(
   (response) => {
     return response
   },
   (error) => {
+    // Enhanced error logging for debugging
+    console.error('API Error Details:', {
+      message: error.message,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      fullURL: error.config?.baseURL + error.config?.url,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      code: error.code,
+    })
+    
     const message = error.response?.data?.message || error.message || 'An error occurred'
     
     if (error.response?.status >= 500) {
       toast.error('Server error. Please try again later.')
     } else if (error.response?.status >= 400) {
       toast.error(message)
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      toast.error('Cannot connect to server. Make sure the backend is running on port 3001.')
     }
 
     return Promise.reject(error)

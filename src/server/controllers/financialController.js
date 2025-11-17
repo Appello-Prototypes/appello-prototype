@@ -28,9 +28,11 @@ const financialController = {
           path: 'costCodeBreakdown.scheduleOfValuesId',
           select: 'lineNumber description totalValue'
         })
-        .sort({ invoiceDate: -1 });
+        .sort({ invoiceDate: -1 })
+        .maxTimeMS(10000) // 10 second timeout
+        .lean(); // Use lean() for faster queries
 
-      // Calculate summary
+      // Calculate summary with timeout
       const summary = await APRegister.aggregate([
         { $match: { jobId: new mongoose.Types.ObjectId(jobId) } },
         { $unwind: '$costCodeBreakdown' },
@@ -46,7 +48,7 @@ const financialController = {
             }
           }
         }
-      ]);
+      ]).option({ maxTimeMS: 10000 }); // 10 second timeout
 
       res.json({
         success: true,

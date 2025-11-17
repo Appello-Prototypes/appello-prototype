@@ -9,6 +9,7 @@ const timeEntryController = {
     try {
       const {
         projectId,
+        jobId,
         workerId,
         costCode,
         startDate,
@@ -21,6 +22,7 @@ const timeEntryController = {
       const filter = {};
       
       if (projectId) filter.projectId = projectId;
+      if (jobId) filter.jobId = jobId;
       if (workerId) filter.workerId = workerId;
       if (costCode) filter.costCode = costCode;
       if (status) filter.status = status;
@@ -41,7 +43,9 @@ const timeEntryController = {
         .populate('approvedBy', 'name')
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit));
+        .limit(parseInt(limit))
+        .maxTimeMS(10000) // 10 second timeout
+        .lean(); // Use lean() for faster queries
 
       const total = await TimeEntry.countDocuments(filter);
 
