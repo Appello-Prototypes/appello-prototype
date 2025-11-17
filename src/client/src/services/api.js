@@ -2,8 +2,17 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 
 // Create axios instance
+const getBaseURL = () => {
+  // In production, use the same domain as the frontend
+  if (import.meta.env.PROD) {
+    return window.location.origin;
+  }
+  // In development, use the provided VITE_API_URL or default to localhost
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+};
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseURL: getBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
