@@ -1,18 +1,25 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
-// Create axios instance
+// Create axios instance with production-first configuration
 const getBaseURL = () => {
-  // In production, use the same domain as the frontend
-  if (import.meta.env.PROD) {
-    return window.location.origin;
+  // Check if we're running in production (Vercel deployment)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    const url = window.location.origin;
+    console.log('🚀 Production API URL:', url);
+    return url;
   }
-  // In development, use the provided VITE_API_URL or default to localhost
-  return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  // Development fallback
+  const devUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  console.log('🛠️ Development API URL:', devUrl);
+  return devUrl;
 };
 
+const baseURL = getBaseURL();
+console.log('📡 Final API Base URL:', baseURL);
+
 export const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: baseURL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
