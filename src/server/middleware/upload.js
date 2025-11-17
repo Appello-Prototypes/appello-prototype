@@ -2,21 +2,39 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directory exists
-const uploadDir = process.env.UPLOAD_PATH || './uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Configure upload directory for serverless environment
+const uploadDir = process.env.UPLOAD_PATH || '/tmp/uploads';
+
+// Ensure upload directory exists (use /tmp in serverless environment)
+const ensureUploadDir = () => {
+  try {
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+  } catch (error) {
+    console.warn('Could not create upload directory:', error.message);
+    // In serverless environments, we'll handle uploads differently
+  }
+};
+
+// Initialize upload directory
+ensureUploadDir();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Create subdirectory based on upload type
     const subDir = path.join(uploadDir, 'tasks');
-    if (!fs.existsSync(subDir)) {
-      fs.mkdirSync(subDir, { recursive: true });
+    try {
+      if (!fs.existsSync(subDir)) {
+        fs.mkdirSync(subDir, { recursive: true });
+      }
+      cb(null, subDir);
+    } catch (error) {
+      console.warn('Could not create subdirectory:', error.message);
+      // Fallback to main upload directory
+      cb(null, uploadDir);
     }
-    cb(null, subDir);
   },
   filename: function (req, file, cb) {
     // Generate unique filename
