@@ -11,18 +11,24 @@ const ensureUploadDir = () => {
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
+    return true;
   } catch (error) {
     console.warn('Could not create upload directory:', error.message);
     // In serverless environments, we'll handle uploads differently
+    return false;
   }
 };
 
-// Initialize upload directory
-ensureUploadDir();
+// Don't initialize on module load - do it when needed
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    // Ensure upload directory exists first
+    if (!ensureUploadDir()) {
+      return cb(new Error('Upload directory not available in serverless environment'), null);
+    }
+    
     // Create subdirectory based on upload type
     const subDir = path.join(uploadDir, 'tasks');
     try {
