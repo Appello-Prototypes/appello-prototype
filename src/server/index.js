@@ -42,10 +42,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect(process.env.MONGODB_URI)
 .then(() => {
   console.log('Connected to MongoDB');
 })
@@ -177,21 +174,27 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`🚀 Appello Task Management API running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    mongoose.connection.close();
+// For Vercel serverless deployment, export the app directly
+if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
+  // Export for Vercel serverless functions
+  module.exports = app;
+} else {
+  // Local development server
+  const PORT = process.env.PORT || 3001;
+  server.listen(PORT, () => {
+    console.log(`🚀 Appello Task Management API running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   });
-});
 
-module.exports = { app, io };
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Process terminated');
+      mongoose.connection.close();
+    });
+  });
+
+  module.exports = { app, io };
+}
