@@ -16,6 +16,11 @@
     "reseed": "node scripts/seed.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:e2e": "playwright test",
+    "test:e2e:local": "playwright test --project=local",
+    "test:e2e:production": "playwright test --project=production",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix"
   },
@@ -37,11 +42,13 @@
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "concurrently": "^8.2.2",
     "eslint": "^8.55.0",
     "eslint-config-prettier": "^9.1.0",
     "jest": "^29.7.0",
     "nodemon": "^3.0.2",
+    "playwright": "^1.56.1",
     "prettier": "^3.1.1",
     "supertest": "^6.3.3"
   },

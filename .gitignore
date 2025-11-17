@@ -142,3 +142,8 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 .vercel
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
