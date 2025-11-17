@@ -41,10 +41,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static file serving for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI)
+// Database connection with Atlas optimization
+mongoose.connect(process.env.MONGODB_URI, {
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+  bufferCommands: false, // Disable mongoose buffering
+  bufferMaxEntries: 0 // Disable mongoose buffering
+})
 .then(() => {
-  console.log('Connected to MongoDB');
+  console.log('Connected to MongoDB Atlas');
 })
 .catch((error) => {
   console.error('MongoDB connection error:', error);

@@ -20,7 +20,7 @@ console.log('📡 Final API Base URL:', baseURL);
 
 export const api = axios.create({
   baseURL: baseURL,
-  timeout: 10000,
+  timeout: 30000, // Increased timeout for Atlas connections
   headers: {
     'Content-Type': 'application/json',
   },
