@@ -32,6 +32,9 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "MONGODB_URI": "mongodb+srv://Vercel-Admin-appello-prototype-db:YEkttUnBkYYGtTfq@appello-prototype-db.nrral5a.mongodb.net/appello-tasks-prod?retryWrites=true&w=majority",
+    "JWT_SECRET": "production-jwt-secret-key-2024-appello-task-management",
+    "PORT": "3001"
   }
 }
