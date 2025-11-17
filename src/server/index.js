@@ -174,8 +174,10 @@ app.use('*', (req, res) => {
   });
 });
 
-// For Vercel serverless deployment, export the app directly
-if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
+// Check if we're in Vercel serverless environment
+const isVercelServerless = process.env.VERCEL === '1' || process.env.NOW_REGION;
+
+if (isVercelServerless) {
   // Export for Vercel serverless functions
   module.exports = app;
 } else {
@@ -184,7 +186,7 @@ if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
   server.listen(PORT, () => {
     console.log(`🚀 Appello Task Management API running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
   });
 
   // Graceful shutdown
