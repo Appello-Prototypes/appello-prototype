@@ -4,6 +4,7 @@ const TimelogRegister = require('../models/TimelogRegister');
 const ProgressReport = require('../models/ProgressReport');
 const ScheduleOfValues = require('../models/ScheduleOfValues');
 const Job = require('../models/Job');
+const User = require('../models/User');
 const { validationResult } = require('express-validator');
 
 const financialController = {
@@ -72,7 +73,7 @@ const financialController = {
       const { jobId } = req.params;
       const { startDate, endDate, worker, costCode, craft } = req.query;
 
-      const filter = { jobId };
+      const filter = { jobId: new mongoose.Types.ObjectId(jobId) };
       if (startDate && endDate) {
         filter.workDate = { $gte: new Date(startDate), $lte: new Date(endDate) };
       }

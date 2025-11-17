@@ -331,7 +331,8 @@ timelogRegisterSchema.pre('save', function(next) {
 
 // Static methods for reporting
 timelogRegisterSchema.statics.getCostByJob = function(jobId, startDate, endDate) {
-  const match = { jobId, status: 'approved' };
+  const mongoose = require('mongoose');
+  const match = { jobId: new mongoose.Types.ObjectId(jobId), status: 'approved' };
   if (startDate && endDate) {
     match.workDate = { $gte: startDate, $lte: endDate };
   }

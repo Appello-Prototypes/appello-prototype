@@ -115,4 +115,7 @@ router.post('/bulk-create', [
 // Job initialization
 router.post('/jobs/:jobId/initialize', sovController.initializeJobSOV);
 
+// Job-specific SOV line items
+router.get('/job/:jobId', sovController.getJobSOVLineItems);
+
 module.exports = router;

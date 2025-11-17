@@ -325,6 +325,28 @@ exports.initializeJobSOV = async (req, res) => {
   }
 };
 
+// Get SOV line items for a specific job
+exports.getJobSOVLineItems = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    const sovLineItems = await ScheduleOfValues.find({ jobId })
+      .populate(['systemId', 'areaId', 'phaseId', 'moduleId', 'componentId'])
+      .sort({ sortOrder: 1, lineNumber: 1 });
+
+    res.json({
+      success: true,
+      data: sovLineItems
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching job SOV line items',
+      error: error.message
+    });
+  }
+};
+
 // Helper function to get model by type
 function getModelByType(type) {
   const models = {
