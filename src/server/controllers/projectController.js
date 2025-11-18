@@ -19,7 +19,8 @@ const projectController = {
         .populate('projectManager', 'name')
         .select('name projectNumber client.name status startDate endDate totalContractValue overallProgress createdAt')
         .sort({ createdAt: -1 })
-        .lean(); // Use lean for faster queries
+        .lean() // Use lean for faster queries
+        .maxTimeMS(process.env.NODE_ENV === 'production' ? 10000 : 5000); // 5s for local, 10s for prod
       
       res.json({
         success: true,

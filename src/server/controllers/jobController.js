@@ -31,7 +31,7 @@ const jobController = {
         .select('name jobNumber client.name status startDate endDate contractValue overallProgress createdAt projectId')
         .sort({ createdAt: -1 })
         .lean() // Use lean for faster queries
-        .maxTimeMS(10000); // 10 second timeout
+        .maxTimeMS(process.env.NODE_ENV === 'production' ? 10000 : 5000); // 5s for local, 10s for prod
       
       res.json({
         success: true,

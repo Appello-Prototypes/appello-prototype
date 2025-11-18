@@ -67,9 +67,10 @@ const taskController = {
         .sort(sortConfig)
         .skip(skip)
         .limit(parseInt(limit))
-        .lean(); // Use lean for faster queries
+        .lean() // Use lean for faster queries
+        .maxTimeMS(process.env.NODE_ENV === 'production' ? 10000 : 5000); // 5s for local, 10s for prod
 
-      const total = await Task.countDocuments(filter);
+      const total = await Task.countDocuments(filter).maxTimeMS(process.env.NODE_ENV === 'production' ? 10000 : 5000);
 
       res.json({
         success: true,

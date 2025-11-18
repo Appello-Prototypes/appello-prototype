@@ -110,22 +110,32 @@ const connectDB = async () => {
   }
 
   // Log which database we're connecting to (without exposing credentials)
+  // Only log if not already connected (to reduce noise)
   const dbName = mongoUri.match(/\/\/([^:]+):[^@]+@[^/]+\/([^?]+)/)?.[2] || 'unknown';
   const envType = process.env.NODE_ENV === 'production' || process.env.VERCEL ? 'PRODUCTION' : 'DEVELOPMENT';
-  console.log(`🔌 Connecting to ${envType} database: ${dbName}`);
+  // Only log on initial connection, not on every check
+  if (!cached.promise) {
+    console.log(`🔌 Connecting to ${envType} database: ${dbName}`);
+  }
 
   // Create new connection promise
+  // Optimize timeouts based on environment
+  const isLocalDev = process.env.NODE_ENV !== 'production' && !process.env.VERCEL;
   const opts = {
-    maxPoolSize: 50, // Increased pool size for better concurrency
-    minPoolSize: 5, // Maintain minimum connections
-    serverSelectionTimeoutMS: 10000, // 10 seconds for serverless
-    socketTimeoutMS: 45000,
-    connectTimeoutMS: 10000,
+    maxPoolSize: isLocalDev ? 10 : 50, // Smaller pool for local dev
+    minPoolSize: isLocalDev ? 1 : 5, // Lower min pool for local dev
+    serverSelectionTimeoutMS: isLocalDev ? 2000 : 10000, // 2s for local, 10s for serverless
+    socketTimeoutMS: isLocalDev ? 10000 : 45000, // Shorter socket timeout for local
+    connectTimeoutMS: isLocalDev ? 2000 : 10000, // 2s for local, 10s for serverless
     // Optimize for performance
     retryWrites: true,
     retryReads: true,
     // Use compression for faster data transfer
     compressors: ['zlib'],
+    // Reduce heartbeat frequency for local dev to reduce overhead
+    heartbeatFrequencyMS: isLocalDev ? 30000 : 10000, // Less frequent heartbeats for local
+    // Direct connection for local dev (faster)
+    directConnection: false, // Keep false for replica sets
   };
 
   // Store the URI we're connecting to
@@ -213,8 +223,20 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // Middleware to ensure DB connection before handling requests (serverless)
+// Optimized: Fast path if already connected
 const ensureDBConnection = async (req, res, next) => {
   try {
+    // Fast path: If already connected to correct database, skip connection check
+    const mongoUri = process.env.NODE_ENV === 'production' || process.env.VERCEL
+      ? process.env.MONGODB_URI
+      : (process.env.MONGODB_DEV_URI || process.env.MONGODB_URI);
+    
+    if (mongoose.connection.readyState === 1 && cached.uri === mongoUri) {
+      // Already connected to correct database, proceed immediately
+      return next();
+    }
+    
+    // Otherwise, ensure connection
     await connectDB();
     next();
   } catch (error) {
