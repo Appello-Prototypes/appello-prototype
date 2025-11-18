@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
 const TimeEntry = require('../models/TimeEntry');
@@ -38,10 +39,17 @@ const projectController = {
   // GET /api/projects/:id
   getProjectById: async (req, res) => {
     try {
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid project ID format'
+        });
+      }
+
       const project = await Project.findById(req.params.id)
         .populate('projectManager', 'name email phone')
-        .populate('fieldSupervisor', 'name email phone')
-        .populate('foremen', 'name email phone');
+        .lean(); // Use lean() for faster queries and to avoid Mongoose document issues
 
       if (!project) {
         return res.status(404).json({
@@ -55,10 +63,18 @@ const projectController = {
         data: project
       });
     } catch (error) {
+      console.error('Error in getProjectById:', error);
+      // Handle specific MongoDB errors
+      if (error.name === 'CastError') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid project ID format'
+        });
+      }
       res.status(500).json({
         success: false,
         message: 'Error fetching project',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   },

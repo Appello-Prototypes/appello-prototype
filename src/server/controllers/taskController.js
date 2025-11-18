@@ -23,6 +23,7 @@ const taskController = {
         category,
         dueDate,
         search,
+        workOrderId,
         sortBy = 'createdAt',
         sortOrder = 'desc'
       } = req.query;
@@ -36,6 +37,7 @@ const taskController = {
       if (jobId) filter.jobId = jobId;
       if (projectId) filter.projectId = projectId;
       if (category) filter.category = category;
+      if (workOrderId) filter.workOrderId = workOrderId;
       
       if (dueDate) {
         const date = new Date(dueDate);
@@ -99,7 +101,10 @@ const taskController = {
       const task = await Task.findById(req.params.id)
         .populate('assignedTo', 'name email avatar phone')
         .populate('createdBy', 'name email')
-        .populate('approvedBy', 'name email');
+        .populate('approvedBy', 'name email')
+        .populate('systemId', 'name code')
+        .populate('areaId', 'name code')
+        .populate('phaseId', 'name code');
 
       if (!task) {
         return res.status(404).json({
@@ -392,6 +397,150 @@ const taskController = {
       res.status(500).json({
         success: false,
         message: 'Error fetching dashboard stats',
+        error: error.message
+      });
+    }
+  },
+
+  // GET /api/tasks/:id/timesheet-summary
+  getTaskTimesheetSummary: async (req, res) => {
+    try {
+      const TimeEntry = require('../models/TimeEntry');
+      const taskId = req.params.id;
+
+      const summary = await TimeEntry.aggregate([
+        {
+          $match: { taskId: mongoose.Types.ObjectId(taskId) }
+        },
+        {
+          $group: {
+            _id: null,
+            totalHours: { $sum: '$totalHours' },
+            regularHours: { $sum: '$regularHours' },
+            overtimeHours: { $sum: '$overtimeHours' },
+            doubleTimeHours: { $sum: '$doubleTimeHours' },
+            entryCount: { $sum: 1 },
+            workers: { $addToSet: '$workerId' }
+          }
+        }
+      ]);
+
+      const result = summary[0] || {
+        totalHours: 0,
+        regularHours: 0,
+        overtimeHours: 0,
+        doubleTimeHours: 0,
+        entryCount: 0,
+        workers: []
+      };
+
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          workerCount: result.workers?.length || 0
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching task timesheet summary',
+        error: error.message
+      });
+    }
+  },
+
+  // GET /api/tasks/with-timesheet-data
+  getTasksWithTimesheetData: async (req, res) => {
+    try {
+      const TimeEntry = require('../models/TimeEntry');
+      const {
+        page = 1,
+        limit = 50,
+        jobId,
+        projectId,
+        status,
+        costCode,
+        workOrderId
+      } = req.query;
+
+      const filter = {};
+      if (jobId) filter.jobId = jobId;
+      if (projectId) filter.projectId = projectId;
+      if (status) filter.status = status;
+      if (costCode) filter.costCode = costCode;
+      if (workOrderId) filter.workOrderId = workOrderId;
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      const tasks = await Task.find(filter)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name')
+        .populate('jobId', 'name jobNumber')
+        .populate('projectId', 'name projectNumber')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+
+      // Get timesheet summaries for all tasks
+      const taskIds = tasks.map(t => {
+        // Handle both ObjectId and string formats
+        return typeof t._id === 'string' ? mongoose.Types.ObjectId(t._id) : t._id;
+      });
+      const timesheetData = await TimeEntry.aggregate([
+        {
+          $match: { taskId: { $in: taskIds } }
+        },
+        {
+          $group: {
+            _id: '$taskId',
+            totalHours: { $sum: '$totalHours' },
+            regularHours: { $sum: '$regularHours' },
+            overtimeHours: { $sum: '$overtimeHours' },
+            entryCount: { $sum: 1 }
+          }
+        }
+      ]);
+
+      const timesheetMap = {};
+      timesheetData.forEach(item => {
+        timesheetMap[item._id.toString()] = item;
+      });
+
+      // Merge timesheet data with tasks
+      const tasksWithTimesheet = tasks.map(task => {
+        const timesheet = timesheetMap[task._id.toString()] || {
+          totalHours: 0,
+          regularHours: 0,
+          overtimeHours: 0,
+          entryCount: 0
+        };
+        return {
+          ...task,
+          timesheet,
+          actualHours: timesheet.totalHours || task.actualHours || 0
+        };
+      });
+
+      const total = await Task.countDocuments(filter);
+
+      res.json({
+        success: true,
+        data: {
+          tasks: tasksWithTimesheet,
+          pagination: {
+            current: parseInt(page),
+            pages: Math.ceil(total / parseInt(limit)),
+            total,
+            limit: parseInt(limit)
+          }
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching tasks with timesheet data',
         error: error.message
       });
     }

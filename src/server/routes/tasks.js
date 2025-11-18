@@ -104,10 +104,12 @@ const statusUpdateValidation = [
 
 // Routes
 router.get('/', taskController.getAllTasks);
+router.get('/with-timesheet-data', taskController.getTasksWithTimesheetData);
 router.get('/my-tasks', taskController.getMyTasks);
 router.get('/overdue', taskController.getOverdueTasks);
 router.get('/dashboard', taskController.getDashboardStats);
 router.get('/:id', taskController.getTaskById);
+router.get('/:id/timesheet-summary', taskController.getTaskTimesheetSummary);
 
 router.post('/', taskController.createTask); // Validation removed for demo
 router.put('/:id', taskController.updateTask); // Validation removed for demo

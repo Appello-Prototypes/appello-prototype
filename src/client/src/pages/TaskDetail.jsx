@@ -38,6 +38,12 @@ export default function TaskDetail() {
     enabled: !!task?.projectId
   })
 
+  const { data: workOrder } = useQuery({
+    queryKey: ['work-order', task?.workOrderId],
+    queryFn: () => api.get(`/api/work-orders/${task.workOrderId}`).then(res => res.data.data),
+    enabled: !!task?.workOrderId
+  })
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm()
 
   const updateTaskMutation = useMutation({
@@ -488,7 +494,9 @@ export default function TaskDetail() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">Actual Hours</span>
-                  <span className="text-lg font-bold text-blue-600">{task.actualHours || 0}</span>
+                  <span className="text-lg font-bold text-blue-600">
+                    {task.actualHours ? parseFloat(task.actualHours.toFixed(2)) : 0}
+                  </span>
                 </div>
                 {task.estimatedHours && (
                   <div className="mt-2 text-sm">
@@ -496,7 +504,7 @@ export default function TaskDetail() {
                       (task.actualHours || 0) <= task.estimatedHours ? 'text-green-600' : 'text-red-600'
                     }`}>
                       {(task.actualHours || 0) <= task.estimatedHours ? 'On Budget' : 'Over Budget'} 
-                      ({task.estimatedHours - (task.actualHours || 0)} hrs variance)
+                      ({parseFloat((task.estimatedHours - (task.actualHours || 0)).toFixed(2))} hrs variance)
                     </span>
                   </div>
                 )}
@@ -588,7 +596,9 @@ export default function TaskDetail() {
                     <div className="flex justify-between">
                       <span className="font-medium text-gray-700">System:</span>
                       <span className="text-gray-900">
-                        {project.systems?.find(s => s._id === task.systemId)?.name || task.systemId}
+                        {typeof task.systemId === 'object' && task.systemId?.name 
+                          ? task.systemId.name 
+                          : project.systems?.find(s => String(s._id) === String(task.systemId))?.name || 'N/A'}
                       </span>
                     </div>
                   )}
@@ -597,7 +607,9 @@ export default function TaskDetail() {
                     <div className="flex justify-between">
                       <span className="font-medium text-gray-700">Area:</span>
                       <span className="text-gray-900">
-                        {project.areas?.find(a => a._id === task.areaId)?.name || task.areaId}
+                        {typeof task.areaId === 'object' && task.areaId?.name 
+                          ? task.areaId.name 
+                          : project.areas?.find(a => String(a._id) === String(task.areaId))?.name || 'N/A'}
                       </span>
                     </div>
                   )}
@@ -606,7 +618,9 @@ export default function TaskDetail() {
                     <div className="flex justify-between">
                       <span className="font-medium text-gray-700">Phase:</span>
                       <span className="text-gray-900">
-                        {project.phases?.find(p => p._id === task.phaseId)?.name || task.phaseId}
+                        {typeof task.phaseId === 'object' && task.phaseId?.name 
+                          ? task.phaseId.name 
+                          : project.phases?.find(p => String(p._id) === String(task.phaseId))?.name || 'N/A'}
                       </span>
                     </div>
                   )}
@@ -615,15 +629,59 @@ export default function TaskDetail() {
             </div>
           </div>
 
+          {/* Work Order Information */}
+          {workOrder && (
+            <div className="card p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Work Order</h3>
+              
+              <div className="space-y-3">
+                <Link
+                  to={`/work-orders/${workOrder._id}`}
+                  className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">{workOrder.workOrderNumber}</div>
+                      <div className="text-sm text-gray-600 mt-1">{workOrder.title}</div>
+                    </div>
+                    <DocumentTextIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                </Link>
+                {workOrder.status && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-700">Status:</span>
+                    <span className={`badge ${
+                      workOrder.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      workOrder.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {workOrder.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="card p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Actions</h3>
             
             <div className="space-y-3">
-              <button className="w-full btn-secondary text-left">
-                <DocumentTextIcon className="h-4 w-4 mr-2" />
-                View Work Order
-              </button>
+              {workOrder ? (
+                <Link
+                  to={`/work-orders/${workOrder._id}`}
+                  className="w-full btn-secondary text-left flex items-center"
+                >
+                  <DocumentTextIcon className="h-4 w-4 mr-2" />
+                  View Work Order
+                </Link>
+              ) : (
+                <button className="w-full btn-secondary text-left" disabled>
+                  <DocumentTextIcon className="h-4 w-4 mr-2" />
+                  No Work Order
+                </button>
+              )}
               
               <button className="w-full btn-secondary text-left">
                 <ClockIcon className="h-4 w-4 mr-2" />

@@ -18,6 +18,7 @@
     "fix:progress-reports": "node scripts/fix-progress-report-summaries.js",
     "seed:fresh": "node scripts/seed-complete-fresh.js",
     "seed:both": "node scripts/seed-both-databases.js",
+    "seed:tasks": "node scripts/seed-tasks-for-three-jobs.js",
     "db:sync": "node scripts/sync-db-schema.js prod-to-dev",
     "db:sync-data": "node scripts/sync-db-data.js",
     "db:indexes": "node scripts/create-indexes.js",

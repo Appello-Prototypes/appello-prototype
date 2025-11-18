@@ -65,6 +65,12 @@ const taskSchema = new mongoose.Schema({
     ref: 'Project'
   },
   
+  // Work Order relationship (optional - tasks can exist without work orders)
+  workOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'WorkOrder'
+  },
+  
   // Work breakdown structure integration - Enhanced SOV
   systemId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -136,7 +142,8 @@ const taskSchema = new mongoose.Schema({
     enum: ['insulation', 'painting', 'heat_tracing', 'fireproofing', 'general', 'equipment']
   },
   
-  // Work order information
+  // Work order information (legacy field - kept for backward compatibility)
+  // New tasks should use workOrderId instead
   workOrderNumber: {
     type: String
   },
@@ -250,6 +257,7 @@ taskSchema.index({ dueDate: 1, status: 1 });
 taskSchema.index({ createdAt: -1 });
 taskSchema.index({ costCode: 1 });
 taskSchema.index({ systemId: 1, areaId: 1 });
+taskSchema.index({ workOrderId: 1, status: 1 });
 taskSchema.index({ 'location.coordinates': '2dsphere' });
 
 // Virtual for overdue status

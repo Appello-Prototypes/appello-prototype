@@ -134,6 +134,87 @@ export const taskAPI = {
   getDashboardStats: () => {
     return api.get('/api/fast-stats')
   },
+
+  // Get tasks with timesheet data
+  getTasksWithTimesheetData: (params = {}) => {
+    return api.get('/api/tasks/with-timesheet-data', { params })
+  },
+
+  // Get task timesheet summary
+  getTaskTimesheetSummary: (id) => {
+    return api.get(`/api/tasks/${id}/timesheet-summary`)
+  },
+}
+
+// Work Order API functions
+export const workOrderAPI = {
+  // Get all work orders with filters
+  getWorkOrders: (params = {}) => {
+    return api.get('/api/work-orders', { params })
+  },
+
+  // Get single work order
+  getWorkOrder: (id) => {
+    return api.get(`/api/work-orders/${id}`)
+  },
+
+  // Create work order
+  createWorkOrder: (data) => {
+    return api.post('/api/work-orders', data)
+  },
+
+  // Update work order
+  updateWorkOrder: (id, data) => {
+    return api.put(`/api/work-orders/${id}`, data)
+  },
+
+  // Delete work order
+  deleteWorkOrder: (id) => {
+    return api.delete(`/api/work-orders/${id}`)
+  },
+
+  // Get tasks for a work order
+  getWorkOrderTasks: (id) => {
+    return api.get(`/api/work-orders/${id}/tasks`)
+  },
+
+  // Add task to work order
+  addTaskToWorkOrder: (id, taskId) => {
+    return api.post(`/api/work-orders/${id}/add-task`, { taskId })
+  },
+
+  // Remove task from work order
+  removeTaskFromWorkOrder: (id, taskId) => {
+    return api.post(`/api/work-orders/${id}/remove-task`, { taskId })
+  },
+
+  // Update work order status
+  updateStatus: (id, status, completionPercentage) => {
+    return api.post(`/api/work-orders/${id}/update-status`, { status, completionPercentage })
+  },
+
+  // Add field note
+  addFieldNote: (id, note) => {
+    return api.post(`/api/work-orders/${id}/add-field-note`, { note })
+  },
+}
+
+// Job API functions (updated to include cost codes)
+export const jobAPI = {
+  // Get all jobs
+  getJobs: (params = {}) => {
+    return api.get('/api/jobs', { params })
+  },
+
+  // Get single job
+  getJob: (id) => {
+    return api.get(`/api/jobs/${id}`)
+  },
+
+  // Get job cost codes
+  getJobCostCodes: (id) => {
+    return api.get(`/api/jobs/${id}/cost-codes`)
+  },
 }
 
 // User API functions

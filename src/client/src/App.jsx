@@ -16,6 +16,9 @@ import SOVLineItems from './pages/SOVLineItems'
 import JobLayout from './components/JobLayout'
 import JobTimeTracking from './pages/JobTimeTracking'
 import JobWorkOrders from './pages/JobWorkOrders'
+import WorkOrderList from './pages/WorkOrderList'
+import WorkOrderDetail from './pages/WorkOrderDetail'
+import CreateWorkOrder from './pages/CreateWorkOrder'
 import JobOverview from './pages/JobOverview'
 import EarnedVsBurned from './pages/EarnedVsBurned'
 import APRegisterView from './pages/APRegisterView'
@@ -24,6 +27,7 @@ import ProgressReports from './pages/ProgressReports'
 import MonthlyCostReport from './pages/MonthlyCostReport'
 import CostToComplete from './pages/CostToComplete'
 import JobFinancialSummary from './pages/JobFinancialSummary'
+import OperationsTasks from './pages/OperationsTasks'
 
 function App() {
   return (
@@ -52,6 +56,10 @@ function App() {
         <Route path="/tasks/create" element={<CreateTask />} />
         <Route path="/tasks/:id" element={<TaskDetail />} />
         <Route path="/my-tasks" element={<MyTasks />} />
+        <Route path="/operations/tasks" element={<OperationsTasks />} />
+        <Route path="/work-orders" element={<WorkOrderList />} />
+        <Route path="/work-orders/create" element={<CreateWorkOrder />} />
+        <Route path="/work-orders/:id" element={<WorkOrderDetail />} />
         <Route path="/time-entry" element={<TimeEntry />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -1,0 +1,270 @@
+import React, { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { 
+  Squares2X2Icon, 
+  TableCellsIcon, 
+  ChartBarIcon,
+  PlusIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon
+} from '@heroicons/react/24/outline'
+import { taskAPI, jobAPI } from '../services/api'
+import TaskCardView from '../components/tasks/TaskCardView'
+import TaskTableView from '../components/tasks/TaskTableView'
+import TaskGanttView from '../components/tasks/TaskGanttView'
+
+const VIEWS = {
+  CARD: 'card',
+  TABLE: 'table',
+  GANTT: 'gantt'
+}
+
+export default function OperationsTasks() {
+  const [view, setView] = useState(VIEWS.CARD)
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    priority: '',
+    jobId: '',
+    costCode: '',
+    assignedTo: ''
+  })
+  const [page, setPage] = useState(1)
+
+  // Fetch tasks with timesheet data
+  const { data: tasksData, isLoading, error, refetch } = useQuery({
+    queryKey: ['tasks-operations', filters, page],
+    queryFn: () => taskAPI.getTasksWithTimesheetData({ 
+      ...filters, 
+      page, 
+      limit: view === VIEWS.GANTT ? 100 : 20 
+    }).then(res => res.data.data),
+    keepPreviousData: true,
+    staleTime: 30 * 1000,
+  })
+
+  // Fetch jobs for filter dropdown
+  const { data: jobsData } = useQuery({
+    queryKey: ['jobs'],
+    queryFn: () => jobAPI.getJobs().then(res => res.data.data),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Fetch cost codes if job is selected
+  const { data: costCodesData } = useQuery({
+    queryKey: ['job-cost-codes', filters.jobId],
+    queryFn: () => jobAPI.getJobCostCodes(filters.jobId).then(res => res.data.data),
+    enabled: !!filters.jobId,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const tasks = tasksData?.tasks || []
+  const pagination = tasksData?.pagination || {}
+  const jobs = jobsData?.jobs || []
+  const costCodes = costCodesData || []
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
+    setPage(1)
+  }
+
+  const handleViewChange = (newView) => {
+    setView(newView)
+    setPage(1) // Reset to first page when changing views
+  }
+
+  const renderView = () => {
+    switch (view) {
+      case VIEWS.CARD:
+        return (
+          <TaskCardView 
+            tasks={tasks} 
+            isLoading={isLoading}
+            onTaskUpdate={refetch}
+          />
+        )
+      case VIEWS.TABLE:
+        return (
+          <TaskTableView 
+            tasks={tasks}
+            isLoading={isLoading}
+            pagination={pagination}
+            page={page}
+            setPage={setPage}
+            onTaskUpdate={refetch}
+          />
+        )
+      case VIEWS.GANTT:
+        return (
+          <TaskGanttView 
+            tasks={tasks}
+            isLoading={isLoading}
+            onTaskUpdate={refetch}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="md:flex md:items-center md:justify-between">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl">
+            Operations - Task Management
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage tasks, track time, and monitor cost codes across all jobs
+          </p>
+        </div>
+        <div className="mt-4 flex md:ml-4 md:mt-0 space-x-3">
+          <Link to="/tasks/create" className="btn-primary">
+            <PlusIcon className="w-4 h-4 mr-2" />
+            Create Task
+          </Link>
+        </div>
+      </div>
+
+      {/* View Switcher */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleViewChange(VIEWS.CARD)}
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                view === VIEWS.CARD
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Squares2X2Icon className="w-5 h-5 mr-2" />
+              Card View
+            </button>
+            <button
+              onClick={() => handleViewChange(VIEWS.TABLE)}
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                view === VIEWS.TABLE
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <TableCellsIcon className="w-5 h-5 mr-2" />
+              Table View
+            </button>
+            <button
+              onClick={() => handleViewChange(VIEWS.GANTT)}
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                view === VIEWS.GANTT
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <ChartBarIcon className="w-5 h-5 mr-2" />
+              Gantt Chart
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card p-6">
+        <div className="flex items-center mb-4">
+          <FunnelIcon className="w-5 h-5 mr-2 text-gray-500" />
+          <h3 className="text-lg font-medium text-gray-900">Filters</h3>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Search */}
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              className="form-input pl-10"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+            />
+          </div>
+
+          {/* Job Filter */}
+          <select
+            className="form-select"
+            value={filters.jobId}
+            onChange={(e) => handleFilterChange('jobId', e.target.value)}
+          >
+            <option value="">All Jobs</option>
+            {jobs.map(job => (
+              <option key={job._id} value={job._id}>
+                {job.jobNumber} - {job.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Cost Code Filter */}
+          <select
+            className="form-select"
+            value={filters.costCode}
+            onChange={(e) => handleFilterChange('costCode', e.target.value)}
+            disabled={!filters.jobId}
+          >
+            <option value="">All Cost Codes</option>
+            {costCodes.map(cc => (
+              <option key={cc.code} value={cc.code}>
+                {cc.code} - {cc.description}
+              </option>
+            ))}
+          </select>
+
+          {/* Status Filter */}
+          <select
+            className="form-select"
+            value={filters.status}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
+          >
+            <option value="">All Statuses</option>
+            <option value="not_started">Not Started</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="on_hold">On Hold</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          {/* Priority Filter */}
+          <select
+            className="form-select"
+            value={filters.priority}
+            onChange={(e) => handleFilterChange('priority', e.target.value)}
+          >
+            <option value="">All Priorities</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="card p-6 bg-red-50 border border-red-200">
+          <div className="text-red-800">
+            <p className="font-medium">Error loading tasks</p>
+            <p className="text-sm mt-1">{error.message}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-3 btn-primary bg-red-600 hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* View Content */}
+      {!error && renderView()}
+    </div>
+  )
+}
+

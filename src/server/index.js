@@ -19,6 +19,7 @@ const timeEntryRoutes = require('./routes/timeEntries');
 const userRoutes = require('./routes/users');
 const sovRoutes = require('./routes/sov');
 const financialRoutes = require('./routes/financial');
+const workOrderRoutes = require('./routes/workOrders');
 const { handleUploadError } = require('./middleware/upload');
 
 // Create Express app
@@ -300,6 +301,7 @@ app.use('/api/time-entries', ensureDBConnection, timeEntryRoutes);
 app.use('/api/users', ensureDBConnection, userRoutes);
 app.use('/api/sov', ensureDBConnection, sovRoutes);
 app.use('/api/financial', ensureDBConnection, financialRoutes);
+app.use('/api/work-orders', ensureDBConnection, workOrderRoutes);
 
 // Version endpoint
 app.get('/api/version', (req, res) => {
