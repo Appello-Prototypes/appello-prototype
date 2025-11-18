@@ -437,6 +437,52 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Diagnostic endpoint for troubleshooting
+app.get('/api/diagnostic', (req, res) => {
+  try {
+    const diagnostics = {
+      success: true,
+      timestamp: new Date().toISOString(),
+      environment: {
+        nodeEnv: process.env.NODE_ENV || 'not set',
+        vercel: !!process.env.VERCEL,
+        nowRegion: process.env.NOW_REGION || 'not set'
+      },
+      database: {
+        mongodbUriSet: !!process.env.MONGODB_URI,
+        mongodbDevUriSet: !!process.env.MONGODB_DEV_URI,
+        connectionState: mongoose.connection.readyState,
+        connectionStateText: mongoose.connection.readyState === 1 ? 'connected' : 
+                             mongoose.connection.readyState === 2 ? 'connecting' : 'disconnected'
+      },
+      modules: {
+        express: typeof express !== 'undefined',
+        mongoose: typeof mongoose !== 'undefined',
+        routesLoaded: {
+          tasks: !!taskRoutes,
+          projects: !!projectRoutes,
+          jobs: !!jobRoutes,
+          financial: !!financialRoutes
+        }
+      },
+      paths: {
+        __dirname: __dirname,
+        processCwd: process.cwd(),
+        nodeVersion: process.version
+      }
+    };
+    
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Diagnostic endpoint error',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Fast stats endpoint for demo
 app.get('/api/fast-stats', (req, res) => {
   res.json({
