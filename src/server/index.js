@@ -62,10 +62,24 @@ if (!cached) {
 }
 
 const connectDB = async () => {
+  // Determine which database to use based on environment
+  // Local development uses MONGODB_DEV_URI, production uses MONGODB_URI
+  const mongoUri = process.env.NODE_ENV === 'production' || process.env.VERCEL
+    ? process.env.MONGODB_URI
+    : (process.env.MONGODB_DEV_URI || process.env.MONGODB_URI);
+  
   // Validate MongoDB URI is set
-  if (!process.env.MONGODB_URI) {
-    throw new Error('MONGODB_URI environment variable is not set');
+  if (!mongoUri) {
+    const envVar = process.env.NODE_ENV === 'production' || process.env.VERCEL
+      ? 'MONGODB_URI'
+      : 'MONGODB_DEV_URI';
+    throw new Error(`${envVar} environment variable is not set`);
   }
+  
+  // Log which database we're connecting to (without exposing credentials)
+  const dbName = mongoUri.match(/\/\/([^:]+):[^@]+@[^/]+\/([^?]+)/)?.[2] || 'unknown';
+  const envType = process.env.NODE_ENV === 'production' || process.env.VERCEL ? 'PRODUCTION' : 'DEVELOPMENT';
+  console.log(`🔌 Connecting to ${envType} database: ${dbName}`);
 
   // If already connected, return the existing connection
   if (cached.conn) {
@@ -88,12 +102,9 @@ const connectDB = async () => {
       compressors: ['zlib'],
     };
 
-    // Log connection attempt (without exposing URI)
-    const uriParts = process.env.MONGODB_URI.split('@');
-    const dbInfo = uriParts.length > 1 ? uriParts[1].split('/')[0] : 'MongoDB';
-    console.log(`🔌 Connecting to MongoDB Atlas (${dbInfo})...`);
+    // Connection logging is done above
 
-    cached.promise = mongoose.connect(process.env.MONGODB_URI, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
       console.log('✅ Connected to MongoDB Atlas');
       cached.conn = mongoose;
       return mongoose;
