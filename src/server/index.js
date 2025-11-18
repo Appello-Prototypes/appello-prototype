@@ -10,16 +10,39 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 
-// Import routes
-const taskRoutes = require('./routes/tasks');
-const authRoutes = require('./routes/auth');
-const projectRoutes = require('./routes/projects');
-const jobRoutes = require('./routes/jobs');
-const timeEntryRoutes = require('./routes/timeEntries');
-const userRoutes = require('./routes/users');
-const sovRoutes = require('./routes/sov');
-const financialRoutes = require('./routes/financial');
-const { handleUploadError } = require('./middleware/upload');
+// Import routes with error handling for production
+let taskRoutes, authRoutes, projectRoutes, jobRoutes, timeEntryRoutes, userRoutes, sovRoutes, financialRoutes, handleUploadError;
+
+try {
+  taskRoutes = require('./routes/tasks');
+  authRoutes = require('./routes/auth');
+  projectRoutes = require('./routes/projects');
+  jobRoutes = require('./routes/jobs');
+  timeEntryRoutes = require('./routes/timeEntries');
+  userRoutes = require('./routes/users');
+  sovRoutes = require('./routes/sov');
+  financialRoutes = require('./routes/financial');
+  handleUploadError = require('./middleware/upload').handleUploadError;
+} catch (error) {
+  console.error('❌ Error loading routes:', error.message);
+  console.error('Stack:', error.stack);
+  // In production, we want to know about this but not crash completely
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    // Create dummy routes that return errors
+    const errorRouter = require('express').Router();
+    errorRouter.use((req, res) => {
+      res.status(500).json({
+        success: false,
+        message: 'Route module failed to load',
+        error: error.message
+      });
+    });
+    taskRoutes = authRoutes = projectRoutes = jobRoutes = timeEntryRoutes = userRoutes = sovRoutes = financialRoutes = errorRouter;
+    handleUploadError = (err, req, res, next) => next(err);
+  } else {
+    throw error; // In dev, fail fast
+  }
+}
 
 // Create Express app
 const app = express();
@@ -494,31 +517,53 @@ app.use('*', (req, res) => {
 // Export connectDB for use in other modules if needed
 module.exports.connectDB = connectDB;
 
-// Check if we're in Vercel serverless environment
-const isVercelServerless = process.env.VERCEL === '1' || process.env.NOW_REGION;
+// Wrap server initialization in try-catch for production safety
+try {
+  // Check if we're in Vercel serverless environment
+  const isVercelServerless = process.env.VERCEL === '1' || process.env.NOW_REGION;
 
-if (isVercelServerless) {
-  // Export for Vercel serverless functions
-  module.exports = app;
-  module.exports.connectDB = connectDB;
-} else {
-  // Local development server
-  const PORT = process.env.PORT || 3001;
-  server.listen(PORT, () => {
-    console.log(`🚀 Appello Task Management API running on port ${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
-    console.log(`📡 MongoDB URI configured: ${process.env.MONGODB_URI ? 'Yes' : 'No'}`);
-  });
+  if (isVercelServerless) {
+    // Export for Vercel serverless functions
+    module.exports = app;
+    module.exports.connectDB = connectDB;
+  } else {
+    // Local development server
+    const PORT = process.env.PORT || 3001;
+    server.listen(PORT, () => {
+      console.log(`🚀 Appello Task Management API running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`📡 MongoDB URI configured: ${process.env.MONGODB_URI ? 'Yes' : 'No'}`);
+    });
 
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-      console.log('Process terminated');
-      mongoose.connection.close();
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        console.log('Process terminated');
+        mongoose.connection.close();
+      });
+    });
+
+    module.exports = { app, io, connectDB };
+  }
+} catch (error) {
+  console.error('❌ Fatal error initializing server:', error.message);
+  console.error('Stack:', error.stack);
+  
+  // Even if initialization fails, export a basic app that returns errors
+  const errorApp = express();
+  errorApp.use((req, res) => {
+    res.status(500).json({
+      success: false,
+      message: 'Server initialization failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   });
-
-  module.exports = { app, io, connectDB };
+  
+  if (process.env.VERCEL === '1' || process.env.NOW_REGION) {
+    module.exports = errorApp;
+  } else {
+    module.exports = { app: errorApp };
+  }
 }
