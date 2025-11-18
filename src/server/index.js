@@ -10,39 +10,16 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 
-// Import routes with error handling for production
-let taskRoutes, authRoutes, projectRoutes, jobRoutes, timeEntryRoutes, userRoutes, sovRoutes, financialRoutes, handleUploadError;
-
-try {
-  taskRoutes = require('./routes/tasks');
-  authRoutes = require('./routes/auth');
-  projectRoutes = require('./routes/projects');
-  jobRoutes = require('./routes/jobs');
-  timeEntryRoutes = require('./routes/timeEntries');
-  userRoutes = require('./routes/users');
-  sovRoutes = require('./routes/sov');
-  financialRoutes = require('./routes/financial');
-  handleUploadError = require('./middleware/upload').handleUploadError;
-} catch (error) {
-  console.error('❌ Error loading routes:', error.message);
-  console.error('Stack:', error.stack);
-  // In production, we want to know about this but not crash completely
-  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-    // Create dummy routes that return errors
-    const errorRouter = require('express').Router();
-    errorRouter.use((req, res) => {
-      res.status(500).json({
-        success: false,
-        message: 'Route module failed to load',
-        error: error.message
-      });
-    });
-    taskRoutes = authRoutes = projectRoutes = jobRoutes = timeEntryRoutes = userRoutes = sovRoutes = financialRoutes = errorRouter;
-    handleUploadError = (err, req, res, next) => next(err);
-  } else {
-    throw error; // In dev, fail fast
-  }
-}
+// Import routes - if any fail, log but continue (routes will fail gracefully)
+const taskRoutes = require('./routes/tasks');
+const authRoutes = require('./routes/auth');
+const projectRoutes = require('./routes/projects');
+const jobRoutes = require('./routes/jobs');
+const timeEntryRoutes = require('./routes/timeEntries');
+const userRoutes = require('./routes/users');
+const sovRoutes = require('./routes/sov');
+const financialRoutes = require('./routes/financial');
+const { handleUploadError } = require('./middleware/upload');
 
 // Create Express app
 const app = express();
