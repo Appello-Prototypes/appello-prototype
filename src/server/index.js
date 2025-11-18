@@ -58,7 +58,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 let cached = global.mongoose;
 
 if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
+  cached = global.mongoose = { conn: null, promise: null, uri: null };
 }
 
 const connectDB = async () => {
@@ -76,14 +76,23 @@ const connectDB = async () => {
     throw new Error(`${envVar} environment variable is not set`);
   }
   
-  // Check if already connected and ready
-  if (mongoose.connection.readyState === 1) {
-    // Connection is ready
+  // CRITICAL FIX: Check if already connected to the CORRECT database
+  // Don't just check readyState - verify it's the right URI!
+  if (mongoose.connection.readyState === 1 && cached.uri === mongoUri) {
+    // Connection is ready AND it's the correct database
     return mongoose.connection;
   }
 
+  // If connected to wrong database, disconnect first
+  if (mongoose.connection.readyState === 1 && cached.uri !== mongoUri) {
+    console.log('⚠️  Connected to different database, reconnecting...');
+    await mongoose.connection.close();
+    cached.conn = null;
+    cached.uri = null;
+  }
+
   // If connection is in progress, wait for it (but with timeout)
-  if (cached.promise) {
+  if (cached.promise && cached.uri === mongoUri) {
     try {
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => 
@@ -93,6 +102,7 @@ const connectDB = async () => {
     } catch (error) {
       // If promise failed or timed out, clear it and retry
       cached.promise = null;
+      cached.uri = null;
       if (cached.conn) {
         cached.conn = null;
       }
@@ -118,6 +128,8 @@ const connectDB = async () => {
     compressors: ['zlib'],
   };
 
+  // Store the URI we're connecting to
+  cached.uri = mongoUri;
   cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
     console.log('✅ Connected to MongoDB Atlas');
     cached.conn = mongoose;
@@ -125,6 +137,7 @@ const connectDB = async () => {
   }).catch((error) => {
     cached.promise = null;
     cached.conn = null;
+    cached.uri = null;
     console.error('❌ MongoDB connection error:', error.message);
     throw error;
   });
@@ -134,6 +147,7 @@ const connectDB = async () => {
   } catch (error) {
     cached.promise = null;
     cached.conn = null;
+    cached.uri = null;
     throw error;
   }
 };

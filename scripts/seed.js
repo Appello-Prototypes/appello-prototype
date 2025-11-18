@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local', override: true });
 const mongoose = require('mongoose');
 const User = require('../src/server/models/User');
 const Task = require('../src/server/models/Task');
@@ -8,8 +8,12 @@ const TimeEntry = require('../src/server/models/TimeEntry');
 
 async function seedDatabase() {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI);
+    // Connect to MongoDB - use dev URI for local seeding
+    const mongoUri = process.env.MONGODB_DEV_URI || process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error('MONGODB_DEV_URI or MONGODB_URI must be set');
+    }
+    await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB');
 
     // Clear existing data
