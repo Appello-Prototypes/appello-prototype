@@ -198,11 +198,16 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
-// API Routes with connection check for serverless
-if (process.env.VERCEL || process.env.NOW_REGION) {
-  // In serverless, ensure connection before each request
-  app.use('/api/*', ensureDBConnection);
-}
+// API Routes with connection check for serverless AND local development
+// Always ensure DB connection for routes that need it (except version and fast-stats)
+app.use('/api/projects', ensureDBConnection);
+app.use('/api/jobs', ensureDBConnection);
+app.use('/api/tasks', ensureDBConnection);
+app.use('/api/time-entries', ensureDBConnection);
+app.use('/api/users', ensureDBConnection);
+app.use('/api/sov', ensureDBConnection);
+app.use('/api/financial', ensureDBConnection);
+app.use('/api/auth', ensureDBConnection);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);

@@ -66,9 +66,18 @@ api.interceptors.response.use(
     })
     
     const message = error.response?.data?.message || error.message || 'An error occurred'
+    const errorData = error.response?.data
     
-    if (error.response?.status >= 500) {
-      toast.error('Server error. Please try again later.')
+    // Handle specific error types
+    if (error.response?.status === 503) {
+      // Database connection unavailable
+      if (errorData?.message?.includes('Database connection') || errorData?.message?.includes('connection unavailable')) {
+        toast.error('Database connection unavailable. Please check your database configuration.')
+      } else {
+        toast.error('Service temporarily unavailable. Please try again later.')
+      }
+    } else if (error.response?.status >= 500) {
+      toast.error(message || 'Server error. Please try again later.')
     } else if (error.response?.status >= 400) {
       toast.error(message)
     } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
