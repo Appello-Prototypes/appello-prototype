@@ -239,11 +239,21 @@ app.set('io', io);
 // Optimized: Fast path if already connected
 const ensureDBConnection = async (req, res, next) => {
   try {
-    // Fast path: If already connected to correct database, skip connection check
-    const mongoUri = process.env.NODE_ENV === 'production' || process.env.VERCEL
-      ? process.env.MONGODB_URI
-      : (process.env.MONGODB_DEV_URI || process.env.MONGODB_URI);
+    // Use same logic as connectDB to determine which database to use
+    let mongoUri;
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+      mongoUri = process.env.MONGODB_URI;
+    } else {
+      // Local development: check for local MongoDB first
+      if (process.env.MONGODB_LOCAL_URI) {
+        mongoUri = process.env.MONGODB_LOCAL_URI;
+      } else {
+        // Fallback to Atlas dev database
+        mongoUri = process.env.MONGODB_DEV_URI || process.env.MONGODB_URI;
+      }
+    }
     
+    // Fast path: If already connected to correct database, skip connection check
     if (mongoose.connection.readyState === 1 && cached.uri === mongoUri) {
       // Already connected to correct database, proceed immediately
       return next();
