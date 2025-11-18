@@ -304,23 +304,49 @@ app.use('/api/financial', ensureDBConnection, financialRoutes);
 // Version endpoint
 app.get('/api/version', (req, res) => {
   try {
-    const packageJson = require('../../package.json');
+    const path = require('path');
+    const fs = require('fs');
+    let packageJson;
+    
+    // Try multiple paths for package.json (Vercel vs local)
+    const possiblePaths = [
+      path.join(__dirname, '../../package.json'),
+      path.join(process.cwd(), 'package.json'),
+      './package.json'
+    ];
+    
+    for (const pkgPath of possiblePaths) {
+      try {
+        if (fs.existsSync(pkgPath)) {
+          packageJson = require(pkgPath);
+          break;
+        }
+      } catch (e) {
+        // Continue to next path
+      }
+    }
+    
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
     const environment = isProduction ? 'production' : 'development';
     
     res.json({
       success: true,
-      version: packageJson.version,
+      version: packageJson?.version || 'unknown',
       environment,
       buildTime: process.env.BUILD_TIME || new Date().toISOString(),
       nodeEnv: process.env.NODE_ENV || 'development',
       vercel: !!process.env.VERCEL
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get version information',
-      error: error.message
+    // Don't fail completely - return basic info
+    res.json({
+      success: true,
+      version: 'unknown',
+      environment: process.env.NODE_ENV === 'production' || process.env.VERCEL ? 'production' : 'development',
+      buildTime: new Date().toISOString(),
+      nodeEnv: process.env.NODE_ENV || 'development',
+      vercel: !!process.env.VERCEL,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -337,14 +363,39 @@ app.get('/api/health', async (req, res) => {
     // Test a simple query to verify connection works
     const connectionTest = mongoose.connection.readyState === 1;
     
-    const packageJson = require('../../package.json');
+    // Try to get package.json version, but don't fail if it's not available
+    let version = 'unknown';
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      const possiblePaths = [
+        path.join(__dirname, '../../package.json'),
+        path.join(process.cwd(), 'package.json'),
+        './package.json'
+      ];
+      
+      for (const pkgPath of possiblePaths) {
+        try {
+          if (fs.existsSync(pkgPath)) {
+            const packageJson = require(pkgPath);
+            version = packageJson.version || 'unknown';
+            break;
+          }
+        } catch (e) {
+          // Continue to next path
+        }
+      }
+    } catch (e) {
+      // Version not critical, continue
+    }
+    
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
     
     res.json({
       success: true,
       message: 'Appello Task Management API is running',
       timestamp: new Date().toISOString(),
-      version: packageJson.version,
+      version: version,
       environment: isProduction ? 'production' : 'development',
       database: {
         status: dbStatus,
