@@ -34,7 +34,7 @@ export default defineConfig({
       name: 'production',
       use: {
         ...devices['Desktop Chrome'],
-        baseURL: process.env.PRODUCTION_URL || 'https://appello-prototype.vercel.app',
+        baseURL: process.env.PRODUCTION_URL || 'https://task-management-kappa-plum.vercel.app',
         actionTimeout: 15000, // Longer timeout for production (network latency)
       },
       testMatch: /.*\.spec\.js/,

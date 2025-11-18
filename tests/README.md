@@ -64,8 +64,8 @@ Set these environment variables to customize test URLs:
 # Local environment URL (default: http://localhost:3000)
 export LOCAL_URL=http://localhost:3000
 
-# Production environment URL (default: https://appello-prototype.vercel.app)
-export PRODUCTION_URL=https://appello-prototype.vercel.app
+# Production environment URL (default: https://task-management-kappa-plum.vercel.app)
+export PRODUCTION_URL=https://task-management-kappa-plum.vercel.app
 
 # Skip local server startup (if server is already running)
 export SKIP_LOCAL_SERVER=true
