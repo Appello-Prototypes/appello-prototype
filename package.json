@@ -15,6 +15,7 @@
     "seed": "node scripts/seed.js",
     "reseed": "node scripts/seed.js",
     "db:sync": "node scripts/sync-db-schema.js prod-to-dev",
+    "db:sync-data": "node scripts/sync-db-data.js",
     "db:indexes": "node scripts/create-indexes.js",
     "test": "jest",
     "test:watch": "jest --watch",
