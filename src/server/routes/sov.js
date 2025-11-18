@@ -33,9 +33,10 @@ const sovLineItemValidation = [
     .notEmpty()
     .withMessage('Line number is required'),
   
+  // costCode is now optional (replaced by costCodeNumber and costCodeName)
   body('costCode')
-    .notEmpty()
-    .withMessage('Cost code is required'),
+    .optional()
+    .trim(),
   
   body('description')
     .notEmpty()
@@ -100,6 +101,7 @@ router.delete('/components/:id', sovController.deleteComponent);
 router.post('/line-items', sovLineItemValidation, sovController.createSOVLineItem);
 router.get('/line-items', sovController.getSOVLineItems);
 router.put('/line-items/:id', sovLineItemValidation, sovController.updateSOVLineItem);
+router.patch('/line-items/:id', sovController.updateSOVLineItem); // Support PATCH for inline editing
 router.delete('/line-items/:id', sovController.deleteSOVLineItem);
 
 // Bulk operations
@@ -117,5 +119,8 @@ router.post('/jobs/:jobId/initialize', sovController.initializeJobSOV);
 
 // Job-specific SOV line items
 router.get('/job/:jobId', sovController.getJobSOVLineItems);
+
+// Get SOV structure for dropdowns
+router.get('/jobs/:jobId/sov-structure', sovController.getSOVStructure);
 
 module.exports = router;

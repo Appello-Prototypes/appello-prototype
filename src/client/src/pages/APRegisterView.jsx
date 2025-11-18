@@ -296,18 +296,25 @@ const APRegisterView = () => {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {summary.map((item) => (
-                <div key={item._id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-900">{item._id}</span>
-                    <span className="text-sm text-gray-500">{item.invoiceCount} invoices</span>
+              {summary.map((item) => {
+                const costCodeDisplay = item.costCodeName 
+                  ? `${item._id} - ${item.costCodeName}`
+                  : item._id;
+                return (
+                  <div key={item._id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-900" title={costCodeDisplay}>
+                        {costCodeDisplay}
+                      </span>
+                      <span className="text-sm text-gray-500">{item.invoiceCount} invoices</span>
+                    </div>
+                    <div className="text-lg font-bold text-gray-900">{formatCurrency(item.totalAmount)}</div>
+                    <div className="text-xs text-gray-500">
+                      Paid: {formatCurrency(item.paidAmount)} ({((item.paidAmount / item.totalAmount) * 100).toFixed(1)}%)
+                    </div>
                   </div>
-                  <div className="text-lg font-bold text-gray-900">{formatCurrency(item.totalAmount)}</div>
-                  <div className="text-xs text-gray-500">
-                    Paid: {formatCurrency(item.paidAmount)} ({((item.paidAmount / item.totalAmount) * 100).toFixed(1)}%)
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -379,12 +386,19 @@ const APRegisterView = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       <div className="space-y-1">
-                        {entry.costCodeBreakdown.map((cc, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <span className="font-medium text-gray-700">{cc.costCode}</span>
-                            <span className="text-gray-900">{formatCurrency(cc.amount)}</span>
-                          </div>
-                        ))}
+                        {entry.costCodeBreakdown.map((cc, index) => {
+                          const costCodeDisplay = cc.costCodeName 
+                            ? `${cc.costCode} - ${cc.costCodeName}`
+                            : cc.costCode;
+                          return (
+                            <div key={index} className="flex items-center justify-between">
+                              <span className="font-medium text-gray-700" title={costCodeDisplay}>
+                                {costCodeDisplay}
+                              </span>
+                              <span className="text-gray-900">{formatCurrency(cc.amount)}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

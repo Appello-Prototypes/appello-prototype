@@ -10,7 +10,6 @@ import TaskDetail from './pages/TaskDetail'
 import CreateTask from './pages/CreateTask'
 import MyTasks from './pages/MyTasks'
 import TimeEntry from './pages/TimeEntry'
-import ProgressReport from './pages/ProgressReport'
 import SOVSetup from './pages/SOVSetup'
 import EnhancedTaskView from './pages/EnhancedTaskView'
 import SOVLineItems from './pages/SOVLineItems'
@@ -21,6 +20,10 @@ import JobOverview from './pages/JobOverview'
 import EarnedVsBurned from './pages/EarnedVsBurned'
 import APRegisterView from './pages/APRegisterView'
 import TimelogRegisterView from './pages/TimelogRegisterView'
+import ProgressReports from './pages/ProgressReports'
+import MonthlyCostReport from './pages/MonthlyCostReport'
+import CostToComplete from './pages/CostToComplete'
+import JobFinancialSummary from './pages/JobFinancialSummary'
 
 function App() {
   return (
@@ -35,9 +38,12 @@ function App() {
           <Route index element={<JobOverview />} />
           <Route path="tasks-enhanced" element={<EnhancedTaskView />} />
           <Route path="sov-setup" element={<SOVSetup />} />
-          <Route path="sov-line-items" element={<SOVLineItems />} />
-          <Route path="progress-report" element={<ProgressReport />} />
+          <Route path="job-financial-summary" element={<JobFinancialSummary />} />
+          <Route path="progress-reports" element={<ProgressReports />} />
           <Route path="earned-vs-burned" element={<EarnedVsBurned />} />
+          <Route path="cost-to-complete" element={<CostToComplete />} />
+          <Route path="sov-line-items" element={<SOVLineItems />} />
+          <Route path="monthly-cost-report" element={<MonthlyCostReport />} />
           <Route path="ap-register" element={<APRegisterView />} />
           <Route path="timelog-register" element={<TimelogRegisterView />} />
           <Route path="work-orders" element={<JobWorkOrders />} />

@@ -35,6 +35,8 @@ const jobSchema = new mongoose.Schema({
   },
   location: {
     address: String,
+    city: String,
+    province: String, // Province/State
     coordinates: {
       type: [Number], // [longitude, latitude]
       index: '2dsphere'
@@ -42,13 +44,28 @@ const jobSchema = new mongoose.Schema({
   },
   
   // Project timeline
-  startDate: {
+  plannedStartDate: {
     type: Date,
     required: true
   },
-  endDate: {
+  actualStartDate: {
+    type: Date
+  },
+  plannedEndDate: {
     type: Date,
     required: true
+  },
+  actualEndDate: {
+    type: Date
+  },
+  // Legacy fields for backward compatibility
+  startDate: {
+    type: Date,
+    required: false
+  },
+  endDate: {
+    type: Date,
+    required: false
   },
   
   // Financial information
@@ -60,8 +77,8 @@ const jobSchema = new mongoose.Schema({
   // Project status
   status: {
     type: String,
-    enum: ['bidding', 'awarded', 'active', 'on_hold', 'completed', 'cancelled'],
-    default: 'active'
+    enum: ['quoting', 'won', 'in_progress', 'on_hold', 'complete', 'closed'],
+    default: 'quoting'
   },
   
   // Job team
@@ -69,6 +86,10 @@ const jobSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  estimator: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   fieldSupervisor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -204,6 +225,25 @@ jobSchema.virtual('budgetVariance').get(function() {
   const totalActualCost = this.costCodes.reduce((sum, code) => sum + (code.actualCost || 0), 0);
   const totalBudgetCost = this.costCodes.reduce((sum, code) => sum + (code.budgetCost || 0), 0);
   return totalBudgetCost - totalActualCost;
+});
+
+// Pre-save middleware to handle backward compatibility for date fields
+jobSchema.pre('save', function(next) {
+  // If plannedStartDate/plannedEndDate don't exist but startDate/endDate do, copy them
+  if (!this.plannedStartDate && this.startDate) {
+    this.plannedStartDate = this.startDate;
+  }
+  if (!this.plannedEndDate && this.endDate) {
+    this.plannedEndDate = this.endDate;
+  }
+  // If startDate/endDate don't exist but plannedStartDate/plannedEndDate do, copy them for backward compatibility
+  if (!this.startDate && this.plannedStartDate) {
+    this.startDate = this.plannedStartDate;
+  }
+  if (!this.endDate && this.plannedEndDate) {
+    this.endDate = this.plannedEndDate;
+  }
+  next();
 });
 
 // Methods

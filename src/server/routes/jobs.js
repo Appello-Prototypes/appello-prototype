@@ -47,6 +47,7 @@ const jobValidation = [
 router.get('/', jobController.getAllJobs);
 router.get('/:id', jobController.getJobById);
 router.post('/', jobController.createJob);
+router.patch('/:id', jobController.updateJob);
 
 // Job-specific data endpoints
 router.get('/:id/schedule-of-values', jobController.getScheduleOfValues);

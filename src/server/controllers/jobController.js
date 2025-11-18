@@ -69,6 +69,7 @@ const jobController = {
 
       const job = await Job.findById(req.params.id)
         .populate('jobManager', 'name email phone')
+        .populate('estimator', 'name email phone')
         .populate('projectId', 'name projectNumber')
         .populate('fieldSupervisor', 'name email phone')
         .populate('foremen', 'name email phone')
@@ -110,6 +111,7 @@ const jobController = {
       await job.save();
 
       await job.populate('jobManager', 'name email');
+      await job.populate('estimator', 'name email');
       await job.populate('projectId', 'name projectNumber');
       await job.populate('fieldSupervisor', 'name email');
 
@@ -123,6 +125,50 @@ const jobController = {
         success: false,
         message: 'Error creating job',
         error: error.message
+      });
+    }
+  },
+
+  // PATCH /api/jobs/:id
+  updateJob: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job ID format'
+        });
+      }
+
+      const job = await Job.findByIdAndUpdate(
+        req.params.id,
+        { $set: req.body },
+        { new: true, runValidators: true }
+      )
+        .populate('jobManager', 'name email phone')
+        .populate('estimator', 'name email phone')
+        .populate('projectId', 'name projectNumber')
+        .populate('fieldSupervisor', 'name email phone')
+        .populate('foremen', 'name email phone')
+        .lean();
+
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Job updated successfully',
+        data: job
+      });
+    } catch (error) {
+      console.error('Error in updateJob:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating job',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   },

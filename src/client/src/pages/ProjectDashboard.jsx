@@ -157,14 +157,6 @@ function ProjectDashboard() {
         {isJobView && (
           <>
             <Link 
-              to={`/jobs/${jobId}/sov-setup`} 
-              className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow text-center"
-            >
-              <DocumentTextIcon className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
-              <div className="text-sm font-medium text-gray-900">SOV Setup</div>
-            </Link>
-            
-            <Link 
               to={`/jobs/${jobId}/sov-line-items`} 
               className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow text-center"
             >

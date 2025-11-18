@@ -18,15 +18,34 @@ router.get('/:jobId/cost-breakdown', financialController.getCostBreakdown);
 
 // Progress Reports
 router.get('/:jobId/progress-reports', financialController.getProgressReports);
+router.get('/:jobId/progress-report/:reportId', financialController.getProgressReport);
 router.post('/:jobId/progress-report', [
   body('reportNumber').notEmpty().withMessage('Report number is required'),
   body('reportDate').isISO8601().withMessage('Valid report date is required'),
   body('reportPeriodStart').isISO8601().withMessage('Valid period start date is required'),
-  body('reportPeriodEnd').isISO8601().withMessage('Valid period end date is required'),
-  body('lineItems').isArray({ min: 1 }).withMessage('At least one line item is required')
+  body('reportPeriodEnd').isISO8601().withMessage('Valid period end date is required')
 ], financialController.createProgressReport);
+router.put('/:jobId/progress-report/:reportId', financialController.updateProgressReport);
+router.delete('/:jobId/progress-report/:reportId', financialController.deleteProgressReport);
 
 // Financial Dashboard
 router.get('/:jobId/dashboard', financialController.getFinancialDashboard);
+
+// Monthly Cost Report
+router.get('/:jobId/monthly-cost-report', financialController.getMonthlyCostReport);
+
+// Cost to Complete Report
+router.get('/:jobId/cost-to-complete', financialController.getCostToCompleteReport);
+router.post('/:jobId/cost-to-complete/submit', financialController.submitCostToCompleteForecast);
+
+// Cost to Complete Forecasts
+router.get('/:jobId/cost-to-complete/forecasts', financialController.getCostToCompleteForecasts);
+router.get('/:jobId/cost-to-complete/forecast/:forecastId', financialController.getCostToCompleteForecast);
+router.put('/:jobId/cost-to-complete/forecast/:forecastId', financialController.updateCostToCompleteForecast);
+router.delete('/:jobId/cost-to-complete/forecast/:forecastId', financialController.deleteCostToCompleteForecast);
+router.get('/:jobId/cost-to-complete/forecasts/analytics', financialController.getCostToCompleteAnalytics);
+
+// Job Financial Summary
+router.get('/:jobId/job-financial-summary', financialController.getJobFinancialSummary);
 
 module.exports = router;

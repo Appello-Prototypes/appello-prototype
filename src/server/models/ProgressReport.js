@@ -32,166 +32,149 @@ const progressReportSchema = new mongoose.Schema({
     required: true
   },
 
-  // Progress Report Line Items
+  // Report completed by
+  completedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  completedByName: {
+    type: String,
+    trim: true
+  },
+
+  // Progress Report Line Items - organized by Area and System
   lineItems: [{
     scheduleOfValuesId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ScheduleOfValues',
       required: true
     },
-    lineNumber: {
-      type: String,
-      required: true
+    areaId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Area'
     },
-    costCode: {
+    areaName: {
       type: String,
       required: true,
-      uppercase: true
+      trim: true
+    },
+    systemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'System'
+    },
+    systemName: {
+      type: String,
+      required: true,
+      trim: true
     },
     description: {
       type: String,
-      required: true
+      trim: true
     },
     
     // SOV Financial Data
-    totalContractValue: {
+    assignedCost: {
       type: Number,
       required: true,
       min: 0
     },
     
-    // Progress Reporting
-    previousProgress: {
+    // Submitted CTD (Complete To Date) - what field reports
+    submittedCTD: {
+      amount: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+      percent: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+      }
+    },
+    
+    // Approved CTD - what's approved for billing
+    approvedCTD: {
+      amount: {
+        type: Number,
+        required: true,
+        min: 0
+      },
+      percent: {
+        type: Number,
+        required: true,
+        min: 0,
+        max: 100
+      }
+    },
+    
+    // Previous Complete - from previous progress report
+    previousComplete: {
+      amount: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+      percent: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+      }
+    },
+    
+    // Holdback This Period (typically 10%)
+    holdbackThisPeriod: {
       type: Number,
       default: 0,
+      min: 0
+    },
+    holdbackPercent: {
+      type: Number,
+      default: 10,
       min: 0,
       max: 100
     },
-    currentProgress: {
-      type: Number,
-      required: true,
-      min: 0,
-      max: 100
-    },
-    progressThisPeriod: {
-      type: Number,
-      min: 0,
-      max: 100
-    },
     
-    // Earned Value Calculations
-    previousEarnedValue: {
+    // Due This Period - calculated from approved CTD minus previous complete minus holdback
+    dueThisPeriod: {
       type: Number,
-      default: 0,
-      min: 0
-    },
-    currentEarnedValue: {
-      type: Number,
-      min: 0
-    },
-    earnedThisPeriod: {
-      type: Number,
-      min: 0
-    },
-    
-    // Cost Tracking (Burned)
-    previousCostToDate: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    costThisPeriod: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    totalCostToDate: {
-      type: Number,
-      min: 0
-    },
-    
-    // Labor vs Material Breakdown
-    laborCostThisPeriod: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    materialCostThisPeriod: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    equipmentCostThisPeriod: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    
-    // Variance Analysis
-    earnedVsBurnedVariance: {
-      type: Number
-    },
-    scheduleVariance: {
-      type: Number
-    },
-    costVariance: {
-      type: Number
-    },
-    
-    // Units and Productivity
-    unitsCompletedThisPeriod: {
-      quantity: Number,
-      unit: String,
-      description: String
-    },
-    cumulativeUnitsCompleted: {
-      quantity: Number,
-      unit: String,
-      description: String
-    },
-    
-    // Field Notes and Issues
-    fieldNotes: {
-      type: String,
-      trim: true
-    },
-    issues: [{
-      description: String,
-      severity: { type: String, enum: ['low', 'medium', 'high', 'critical'] },
-      status: { type: String, enum: ['open', 'resolved', 'deferred'] }
-    }]
+      default: 0
+    }
   }],
 
   // Report Summary
   summary: {
-    totalEarnedThisPeriod: {
+    totalAssignedCost: {
       type: Number,
       default: 0
     },
-    totalCostThisPeriod: {
+    totalSubmittedCTD: {
+      amount: { type: Number, default: 0 },
+      percent: { type: Number, default: 0 }
+    },
+    totalApprovedCTD: {
+      amount: { type: Number, default: 0 },
+      percent: { type: Number, default: 0 }
+    },
+    totalPreviousComplete: {
+      amount: { type: Number, default: 0 },
+      percent: { type: Number, default: 0 }
+    },
+    totalHoldbackThisPeriod: {
       type: Number,
       default: 0
     },
-    totalEarnedToDate: {
+    totalDueThisPeriod: {
       type: Number,
       default: 0
     },
-    totalCostToDate: {
+    calculatedPercentCTD: {
       type: Number,
-      default: 0
-    },
-    overallProgress: {
-      type: Number,
+      default: 0,
       min: 0,
       max: 100
-    },
-    earnedVsBurnedRatio: {
-      type: Number
-    },
-    projectHealthStatus: {
-      type: String,
-      enum: ['on_track', 'at_risk', 'critical', 'ahead_of_schedule'],
-      default: 'on_track'
     }
   },
 
@@ -272,54 +255,58 @@ progressReportSchema.index({ reportPeriodStart: 1, reportPeriodEnd: 1 });
 // Pre-save calculations
 progressReportSchema.pre('save', function(next) {
   // Calculate summary values
-  let totalEarnedThisPeriod = 0;
-  let totalCostThisPeriod = 0;
-  let totalEarnedToDate = 0;
-  let totalCostToDate = 0;
-  let totalContractValue = 0;
+  let totalAssignedCost = 0;
+  let totalSubmittedCTDAmount = 0;
+  let totalApprovedCTDAmount = 0;
+  let totalPreviousCompleteAmount = 0;
+  let totalHoldbackThisPeriod = 0;
+  let totalDueThisPeriod = 0;
 
   this.lineItems.forEach(item => {
-    // Calculate progress and earned values
-    item.progressThisPeriod = item.currentProgress - item.previousProgress;
-    item.earnedThisPeriod = (item.progressThisPeriod / 100) * item.totalContractValue;
-    item.currentEarnedValue = (item.currentProgress / 100) * item.totalContractValue;
-    
-    // Calculate total cost
-    item.totalCostToDate = item.previousCostToDate + item.costThisPeriod;
-    
-    // Calculate variances
-    item.earnedVsBurnedVariance = item.currentEarnedValue - item.totalCostToDate;
-    item.costVariance = item.totalContractValue - item.totalCostToDate;
+    // Calculate due this period: (Approved CTD - Previous Complete) - Holdback
+    const amountThisPeriod = item.approvedCTD.amount - item.previousComplete.amount;
+    item.holdbackThisPeriod = (amountThisPeriod * (item.holdbackPercent || 10)) / 100;
+    item.dueThisPeriod = amountThisPeriod - item.holdbackThisPeriod;
     
     // Add to summary
-    totalEarnedThisPeriod += item.earnedThisPeriod;
-    totalCostThisPeriod += item.costThisPeriod;
-    totalEarnedToDate += item.currentEarnedValue;
-    totalCostToDate += item.totalCostToDate;
-    totalContractValue += item.totalContractValue;
+    totalAssignedCost += item.assignedCost || 0;
+    totalSubmittedCTDAmount += item.submittedCTD?.amount || 0;
+    totalApprovedCTDAmount += item.approvedCTD?.amount || 0;
+    totalPreviousCompleteAmount += item.previousComplete?.amount || 0;
+    totalHoldbackThisPeriod += item.holdbackThisPeriod || 0;
+    totalDueThisPeriod += item.dueThisPeriod || 0;
   });
 
   // Update summary
-  this.summary.totalEarnedThisPeriod = totalEarnedThisPeriod;
-  this.summary.totalCostThisPeriod = totalCostThisPeriod;
-  this.summary.totalEarnedToDate = totalEarnedToDate;
-  this.summary.totalCostToDate = totalCostToDate;
-  this.summary.overallProgress = totalContractValue > 0 ? (totalEarnedToDate / totalContractValue) * 100 : 0;
-  this.summary.earnedVsBurnedRatio = totalCostToDate > 0 ? totalEarnedToDate / totalCostToDate : 0;
-  
-  // Determine project health
-  if (this.summary.earnedVsBurnedRatio >= 1.1) {
-    this.summary.projectHealthStatus = 'ahead_of_schedule';
-  } else if (this.summary.earnedVsBurnedRatio >= 0.95) {
-    this.summary.projectHealthStatus = 'on_track';
-  } else if (this.summary.earnedVsBurnedRatio >= 0.85) {
-    this.summary.projectHealthStatus = 'at_risk';
-  } else {
-    this.summary.projectHealthStatus = 'critical';
-  }
+  this.summary.totalAssignedCost = totalAssignedCost;
+  this.summary.totalSubmittedCTD = {
+    amount: totalSubmittedCTDAmount,
+    percent: totalAssignedCost > 0 ? (totalSubmittedCTDAmount / totalAssignedCost) * 100 : 0
+  };
+  this.summary.totalApprovedCTD = {
+    amount: totalApprovedCTDAmount,
+    percent: totalAssignedCost > 0 ? (totalApprovedCTDAmount / totalAssignedCost) * 100 : 0
+  };
+  this.summary.totalPreviousComplete = {
+    amount: totalPreviousCompleteAmount,
+    percent: totalAssignedCost > 0 ? (totalPreviousCompleteAmount / totalAssignedCost) * 100 : 0
+  };
+  this.summary.totalHoldbackThisPeriod = totalHoldbackThisPeriod;
+  this.summary.totalDueThisPeriod = totalDueThisPeriod;
+  this.summary.calculatedPercentCTD = this.summary.totalApprovedCTD.percent;
 
   next();
 });
+
+// Static method to get previous progress report for a job
+progressReportSchema.statics.getPreviousReport = async function(jobId, currentReportDate) {
+  return this.findOne({
+    jobId,
+    reportDate: { $lt: currentReportDate }
+  })
+    .sort({ reportDate: -1 })
+    .limit(1);
+};
 
 // Static methods for analysis
 progressReportSchema.statics.getEarnedVsBurnedAnalysis = function(jobId, asOfDate) {
@@ -336,25 +323,16 @@ progressReportSchema.statics.getEarnedVsBurnedAnalysis = function(jobId, asOfDat
     { $unwind: '$lineItems' },
     {
       $group: {
-        _id: '$lineItems.costCode',
-        totalEarned: { $sum: '$lineItems.currentEarnedValue' },
-        totalCost: { $sum: '$lineItems.totalCostToDate' },
-        currentProgress: { $last: '$lineItems.currentProgress' },
-        contractValue: { $last: '$lineItems.totalContractValue' }
+        _id: '$lineItems.scheduleOfValuesId',
+        totalEarned: { $sum: '$lineItems.approvedCTD.amount' },
+        currentProgress: { $last: '$lineItems.approvedCTD.percent' },
+        contractValue: { $last: '$lineItems.assignedCost' }
       }
     },
     {
       $project: {
-        costCode: '$_id',
+        sovId: '$_id',
         totalEarned: 1,
-        totalCost: 1,
-        variance: { $subtract: ['$totalEarned', '$totalCost'] },
-        variancePercent: {
-          $multiply: [
-            { $divide: [{ $subtract: ['$totalEarned', '$totalCost'] }, '$totalCost'] },
-            100
-          ]
-        },
         currentProgress: 1,
         contractValue: 1
       }
