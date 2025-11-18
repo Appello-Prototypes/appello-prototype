@@ -75,7 +75,40 @@ const generateCostToCompleteData = async (jobId, forecastPeriod) => {
   costCutoffDate.setHours(23, 59, 59, 999);
 
   // Get costs up to cutoff date
-  const [timelogCosts, apCosts] = await Promise.all([
+  // First, get ALL costs (for total costToDate calculation)
+  const [allTimelogCosts, allAPCosts, timelogCosts, apCosts] = await Promise.all([
+    // Get ALL timelog costs (for total costToDate)
+    TimelogRegister.aggregate([
+      {
+        $match: {
+          jobId: new mongoose.Types.ObjectId(jobId),
+          status: 'approved',
+          workDate: { $lte: costCutoffDate }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalCost: { $sum: { $ifNull: ['$totalCostWithBurden', '$totalCost', 0] } }
+        }
+      }
+    ]),
+    // Get ALL AP costs (for total costToDate)
+    APRegister.aggregate([
+      {
+        $match: {
+          jobId: new mongoose.Types.ObjectId(jobId),
+          invoiceDate: { $lte: costCutoffDate }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalAmount: { $sum: '$totalAmount' }
+        }
+      }
+    ]),
+    // Get timelog costs grouped by SOV (for line item calculations)
     TimelogRegister.aggregate([
       {
         $match: {
@@ -97,6 +130,7 @@ const generateCostToCompleteData = async (jobId, forecastPeriod) => {
         }
       }
     ]),
+    // Get AP costs grouped by SOV (for line item calculations)
     APRegister.aggregate([
       {
         $match: {
@@ -156,9 +190,13 @@ const generateCostToCompleteData = async (jobId, forecastPeriod) => {
     item.sovItems.push(sov);
   });
 
+  // Calculate total costToDate from ALL costs (not just those matching progress report line items)
+  const timelogCost = allTimelogCosts.length > 0 ? allTimelogCosts[0].totalCost : 0;
+  const apCost = allAPCosts.length > 0 ? allAPCosts[0].totalAmount : 0;
+  const totalCostToDate = timelogCost + apCost;
+
   // Build line items
   const lineItems = [];
-  let totalCostToDate = 0;
   let totalEarnedToDate = 0;
   let totalEarnedThisPeriod = 0;
   let totalCostThisPeriod = 0;
@@ -268,7 +306,7 @@ const generateCostToCompleteData = async (jobId, forecastPeriod) => {
       forecastedFinalValue
     });
 
-    totalCostToDate += itemTotalCostToDate;
+    // Note: totalCostToDate is now calculated from ALL costs above, not summed here
     totalEarnedToDate += earnedToDate;
     totalEarnedThisPeriod += earnedThisPeriod;
     totalCostThisPeriod += costThisPeriod;

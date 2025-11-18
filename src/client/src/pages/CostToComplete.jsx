@@ -21,7 +21,9 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine
 } from 'recharts'
 
 const CostToComplete = () => {
@@ -35,6 +37,7 @@ const CostToComplete = () => {
   const [loading, setLoading] = useState(true)
   const [jobInfo, setJobInfo] = useState(null)
   const [showCharts, setShowCharts] = useState(true)
+  const [costToDateMap, setCostToDateMap] = useState(new Map()) // Map of forecast period -> costToDate
   
   // Create forecast modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -57,6 +60,43 @@ const CostToComplete = () => {
       fetchDetailData()
     }
   }, [jobId, viewMode, selectedPeriod])
+
+  // Fetch fresh costToDate values for all forecasts when forecasts change
+  useEffect(() => {
+    const fetchAllCostToDate = async () => {
+      if (forecasts.length === 0) return
+
+      const validForecasts = forecasts.filter(f => {
+        if (f.status === 'archived') return false
+        if (f.status === 'not_created' && (!f.summary || Object.keys(f.summary).length === 0)) return false
+        return f.summary && Object.keys(f.summary).length > 0 && f.summary.forecastFinalCost !== undefined
+      })
+
+      if (validForecasts.length === 0) return
+
+      // Fetch costToDate for each forecast period in parallel
+      const costPromises = validForecasts.map(async (forecast) => {
+        // Use progress report date if available, otherwise use forecast creation date
+        let cutoffDate = forecast.progressReportDate || forecast.createdAt
+        if (cutoffDate) {
+          const date = new Date(cutoffDate)
+          date.setHours(23, 59, 59, 999) // End of day
+          const cost = await fetchCostToDate(date.toISOString())
+          return { period: forecast.forecastPeriod, cost }
+        }
+        return { period: forecast.forecastPeriod, cost: 0 }
+      })
+
+      const results = await Promise.all(costPromises)
+      const newMap = new Map()
+      results.forEach(({ period, cost }) => {
+        newMap.set(period, cost)
+      })
+      setCostToDateMap(newMap)
+    }
+
+    fetchAllCostToDate()
+  }, [forecasts, jobId])
 
   const fetchAvailableProgressReports = async () => {
     try {
@@ -138,6 +178,19 @@ const CostToComplete = () => {
       setAnalytics(response.data.data)
     } catch (error) {
       console.error('Error fetching analytics:', error)
+    }
+  }
+
+  // Fetch actual cost to date for a given cutoff date
+  const fetchCostToDate = async (cutoffDate) => {
+    try {
+      const response = await api.get(`/api/financial/${jobId}/earned-vs-burned`, {
+        params: { asOfDate: cutoffDate }
+      })
+      return response.data?.totals?.actualCost || 0
+    } catch (error) {
+      console.error('Error fetching cost to date:', error)
+      return 0
     }
   }
 
@@ -606,13 +659,16 @@ const CostToComplete = () => {
             .sort((a, b) => a.monthNumber - b.monthNumber)
             .map(forecast => {
               const summary = forecast.summary || {}
+              // Use fresh costToDate from map if available, otherwise fall back to stored value
+              const freshCostToDate = costToDateMap.get(forecast.forecastPeriod)
+              const costToDate = freshCostToDate !== undefined ? freshCostToDate : (summary.costToDate || 0)
               return {
                 month: forecast.forecastPeriod,
                 forecastFinalCost: summary.forecastFinalCost || 0,
                 forecastFinalValue: summary.forecastFinalValue || 0,
                 marginAtCompletion: summary.marginAtCompletion || 0,
                 cpi: summary.cpi || 0,
-                costToDate: summary.costToDate || 0,
+                costToDate: costToDate,
                 earnedToDate: summary.earnedToDate || 0,
                 forecastVariance: summary.forecastVariance || 0
               }
@@ -695,9 +751,27 @@ const CostToComplete = () => {
                   <YAxis />
                   <Tooltip formatter={(value) => formatCurrency(value)} />
                   <Legend />
-                  <Bar dataKey="forecastVariance" fill="#ef4444" name="Variance vs Budget" />
+                  <ReferenceLine y={0} stroke="#666" strokeWidth={1} />
+                  <Bar dataKey="forecastVariance" name="Variance vs Budget">
+                    {chartDataFromForecasts.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.forecastVariance < 0 ? '#10b981' : '#ef4444'} 
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              <div className="mt-2 text-xs text-gray-500">
+                <span className="inline-flex items-center mr-4">
+                  <span className="w-3 h-3 bg-green-500 rounded mr-1"></span>
+                  Under Budget (Good)
+                </span>
+                <span className="inline-flex items-center">
+                  <span className="w-3 h-3 bg-red-500 rounded mr-1"></span>
+                  Over Budget (Bad)
+                </span>
+              </div>
             </div>
           </div>
           )
