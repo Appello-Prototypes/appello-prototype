@@ -76,49 +76,64 @@ const connectDB = async () => {
     throw new Error(`${envVar} environment variable is not set`);
   }
   
+  // Check if already connected and ready
+  if (mongoose.connection.readyState === 1) {
+    // Connection is ready
+    return mongoose.connection;
+  }
+
+  // If connection is in progress, wait for it (but with timeout)
+  if (cached.promise) {
+    try {
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      );
+      return await Promise.race([cached.promise, timeoutPromise]);
+    } catch (error) {
+      // If promise failed or timed out, clear it and retry
+      cached.promise = null;
+      if (cached.conn) {
+        cached.conn = null;
+      }
+    }
+  }
+
   // Log which database we're connecting to (without exposing credentials)
   const dbName = mongoUri.match(/\/\/([^:]+):[^@]+@[^/]+\/([^?]+)/)?.[2] || 'unknown';
   const envType = process.env.NODE_ENV === 'production' || process.env.VERCEL ? 'PRODUCTION' : 'DEVELOPMENT';
   console.log(`🔌 Connecting to ${envType} database: ${dbName}`);
 
-  // If already connected, return the existing connection
-  if (cached.conn) {
-    console.log('📦 Using cached MongoDB connection');
-    return cached.conn;
-  }
+  // Create new connection promise
+  const opts = {
+    maxPoolSize: 50, // Increased pool size for better concurrency
+    minPoolSize: 5, // Maintain minimum connections
+    serverSelectionTimeoutMS: 10000, // 10 seconds for serverless
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 10000,
+    // Optimize for performance
+    retryWrites: true,
+    retryReads: true,
+    // Use compression for faster data transfer
+    compressors: ['zlib'],
+  };
 
-  // If connection is in progress, wait for it
-  if (!cached.promise) {
-    const opts = {
-      maxPoolSize: 50, // Increased pool size for better concurrency
-      minPoolSize: 5, // Maintain minimum connections
-      serverSelectionTimeoutMS: 5000, // 5 seconds for serverless
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      // Optimize for performance
-      retryWrites: true,
-      retryReads: true,
-      // Use compression for faster data transfer
-      compressors: ['zlib'],
-    };
-
-    // Connection logging is done above
-
-    cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
-      console.log('✅ Connected to MongoDB Atlas');
-      cached.conn = mongoose;
-      return mongoose;
-    }).catch((error) => {
-      cached.promise = null;
-      console.error('❌ MongoDB connection error:', error.message);
-      throw error;
-    });
-  }
+  cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
+    console.log('✅ Connected to MongoDB Atlas');
+    cached.conn = mongoose;
+    return mongoose;
+  }).catch((error) => {
+    cached.promise = null;
+    cached.conn = null;
+    console.error('❌ MongoDB connection error:', error.message);
+    throw error;
+  });
 
   try {
     return await cached.promise;
   } catch (error) {
     cached.promise = null;
+    cached.conn = null;
     throw error;
   }
 };
