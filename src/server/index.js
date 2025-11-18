@@ -63,10 +63,20 @@ if (!cached) {
 
 const connectDB = async () => {
   // Determine which database to use based on environment
-  // Local development uses MONGODB_DEV_URI, production uses MONGODB_URI
-  const mongoUri = process.env.NODE_ENV === 'production' || process.env.VERCEL
-    ? process.env.MONGODB_URI
-    : (process.env.MONGODB_DEV_URI || process.env.MONGODB_URI);
+  // Local development: prefer local MongoDB, fallback to MONGODB_DEV_URI (Atlas dev)
+  // Production: use MONGODB_URI (Atlas prod)
+  let mongoUri;
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    mongoUri = process.env.MONGODB_URI;
+  } else {
+    // Local development: check for local MongoDB first
+    if (process.env.MONGODB_LOCAL_URI) {
+      mongoUri = process.env.MONGODB_LOCAL_URI;
+    } else {
+      // Fallback to Atlas dev database
+      mongoUri = process.env.MONGODB_DEV_URI || process.env.MONGODB_URI;
+    }
+  }
   
   // Validate MongoDB URI is set
   if (!mongoUri) {
@@ -121,27 +131,30 @@ const connectDB = async () => {
   // Create new connection promise
   // Optimize timeouts based on environment
   const isLocalDev = process.env.NODE_ENV !== 'production' && !process.env.VERCEL;
+  const isLocalMongo = mongoUri.startsWith('mongodb://localhost') || mongoUri.startsWith('mongodb://127.0.0.1');
+  
   const opts = {
-    maxPoolSize: isLocalDev ? 10 : 50, // Smaller pool for local dev
-    minPoolSize: isLocalDev ? 1 : 5, // Lower min pool for local dev
-    serverSelectionTimeoutMS: isLocalDev ? 2000 : 10000, // 2s for local, 10s for serverless
-    socketTimeoutMS: isLocalDev ? 10000 : 45000, // Shorter socket timeout for local
-    connectTimeoutMS: isLocalDev ? 2000 : 10000, // 2s for local, 10s for serverless
+    maxPoolSize: isLocalMongo ? 5 : (isLocalDev ? 10 : 50), // Smaller pool for local MongoDB
+    minPoolSize: isLocalMongo ? 1 : (isLocalDev ? 1 : 5),
+    serverSelectionTimeoutMS: isLocalMongo ? 500 : (isLocalDev ? 2000 : 10000), // 500ms for local MongoDB
+    socketTimeoutMS: isLocalMongo ? 5000 : (isLocalDev ? 10000 : 45000), // 5s for local MongoDB
+    connectTimeoutMS: isLocalMongo ? 500 : (isLocalDev ? 2000 : 10000), // 500ms for local MongoDB
     // Optimize for performance
     retryWrites: true,
     retryReads: true,
-    // Use compression for faster data transfer
-    compressors: ['zlib'],
-    // Reduce heartbeat frequency for local dev to reduce overhead
-    heartbeatFrequencyMS: isLocalDev ? 30000 : 10000, // Less frequent heartbeats for local
-    // Direct connection for local dev (faster)
-    directConnection: false, // Keep false for replica sets
+    // Skip compression for local MongoDB (no network benefit)
+    compressors: isLocalMongo ? [] : ['zlib'],
+    // Less frequent heartbeats for local MongoDB
+    heartbeatFrequencyMS: isLocalMongo ? 60000 : (isLocalDev ? 30000 : 10000),
+    // Direct connection for local MongoDB (faster)
+    directConnection: isLocalMongo ? true : false,
   };
 
   // Store the URI we're connecting to
   cached.uri = mongoUri;
+  const isLocalMongo = mongoUri.startsWith('mongodb://localhost') || mongoUri.startsWith('mongodb://127.0.0.1');
   cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
-    console.log('✅ Connected to MongoDB Atlas');
+    console.log(`✅ Connected to ${isLocalMongo ? 'Local MongoDB' : 'MongoDB Atlas'}`);
     cached.conn = mongoose;
     return mongoose;
   }).catch((error) => {
