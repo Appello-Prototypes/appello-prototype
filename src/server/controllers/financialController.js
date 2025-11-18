@@ -1803,11 +1803,80 @@ const financialController = {
         status: { $ne: 'archived' }
       });
 
+      // Recalculate costToDate and earnedToDate to ensure accuracy
+      // Use progress report date as cutoff, or current date if no progress report
+      const costCutoffDate = progressReport?.reportDate 
+        ? new Date(progressReport.reportDate)
+        : new Date();
+      costCutoffDate.setHours(23, 59, 59, 999);
+
+      // Get ALL costs up to cutoff date (labor + AP)
+      const [timelogCosts, apCosts] = await Promise.all([
+        TimelogRegister.aggregate([
+          {
+            $match: {
+              jobId: new mongoose.Types.ObjectId(jobId),
+              status: 'approved',
+              workDate: { $lte: costCutoffDate }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalCost: { $sum: { $ifNull: ['$totalCostWithBurden', '$totalCost', 0] } }
+            }
+          }
+        ]),
+        APRegister.aggregate([
+          {
+            $match: {
+              jobId: new mongoose.Types.ObjectId(jobId),
+              invoiceDate: { $lte: costCutoffDate }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: '$totalAmount' }
+            }
+          }
+        ])
+      ]);
+
+      const timelogCost = timelogCosts.length > 0 ? timelogCosts[0].totalCost : 0;
+      const apCost = apCosts.length > 0 ? apCosts[0].totalAmount : 0;
+      const recalculatedCostToDate = timelogCost + apCost;
+
+      // Recalculate earnedToDate from progress report if available
+      let recalculatedEarnedToDate = summary.earnedToDate || 0;
+      if (progressReport?.id || progressReport?._id) {
+        const progressReportDoc = await ProgressReport.findById(progressReport.id || progressReport._id);
+        if (progressReportDoc?.summary?.totalApprovedCTD?.amount) {
+          recalculatedEarnedToDate = progressReportDoc.summary.totalApprovedCTD.amount;
+        }
+      }
+
+      // Update summary with recalculated values
+      const updatedSummary = {
+        ...summary,
+        costToDate: recalculatedCostToDate,
+        earnedToDate: recalculatedEarnedToDate,
+        // Recalculate CPI with updated values
+        cpi: recalculatedCostToDate > 0 ? recalculatedEarnedToDate / recalculatedCostToDate : 0
+      };
+
+      // Recalculate line item costs if needed
+      const updatedLineItems = lineItems.map(item => {
+        // Keep the line item costToDate as-is since it's calculated per line item
+        // The summary costToDate is the total across all line items
+        return item;
+      });
+
       let forecast;
       if (existingForecast) {
         // Update existing forecast
-        existingForecast.lineItems = lineItems;
-        existingForecast.summary = summary;
+        existingForecast.lineItems = updatedLineItems;
+        existingForecast.summary = updatedSummary;
         existingForecast.progressReportId = progressReport?.id || progressReport?._id || existingForecast.progressReportId;
         existingForecast.progressReportNumber = progressReport?.reportNumber || existingForecast.progressReportNumber;
         existingForecast.progressReportDate = progressReport?.reportDate ? new Date(progressReport.reportDate) : existingForecast.progressReportDate;
@@ -1835,8 +1904,8 @@ const financialController = {
           progressReportId: progressReport?.id || progressReport?._id || null,
           progressReportNumber: progressReport?.reportNumber || null,
           progressReportDate: progressReport?.reportDate ? new Date(progressReport.reportDate) : new Date(),
-          lineItems,
-          summary,
+          lineItems: updatedLineItems,
+          summary: updatedSummary,
           status,
           createdBy: currentUser?._id,
           notes,
@@ -2065,9 +2134,71 @@ const financialController = {
         });
       }
 
+      // Recalculate costToDate and earnedToDate to ensure accuracy
+      // Use progress report date as cutoff, or forecast's progress report date, or current date
+      const costCutoffDate = forecast.progressReportDate 
+        ? new Date(forecast.progressReportDate)
+        : new Date();
+      costCutoffDate.setHours(23, 59, 59, 999);
+
+      // Get ALL costs up to cutoff date (labor + AP)
+      const [timelogCosts, apCosts] = await Promise.all([
+        TimelogRegister.aggregate([
+          {
+            $match: {
+              jobId: new mongoose.Types.ObjectId(jobId),
+              status: 'approved',
+              workDate: { $lte: costCutoffDate }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalCost: { $sum: { $ifNull: ['$totalCostWithBurden', '$totalCost', 0] } }
+            }
+          }
+        ]),
+        APRegister.aggregate([
+          {
+            $match: {
+              jobId: new mongoose.Types.ObjectId(jobId),
+              invoiceDate: { $lte: costCutoffDate }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: '$totalAmount' }
+            }
+          }
+        ])
+      ]);
+
+      const timelogCost = timelogCosts.length > 0 ? timelogCosts[0].totalCost : 0;
+      const apCost = apCosts.length > 0 ? apCosts[0].totalAmount : 0;
+      const recalculatedCostToDate = timelogCost + apCost;
+
+      // Recalculate earnedToDate from progress report if available
+      let recalculatedEarnedToDate = summary?.earnedToDate || forecast.summary?.earnedToDate || 0;
+      if (forecast.progressReportId) {
+        const progressReportDoc = await ProgressReport.findById(forecast.progressReportId);
+        if (progressReportDoc?.summary?.totalApprovedCTD?.amount) {
+          recalculatedEarnedToDate = progressReportDoc.summary.totalApprovedCTD.amount;
+        }
+      }
+
       // Update fields
       if (lineItems) forecast.lineItems = lineItems;
-      if (summary) forecast.summary = summary;
+      if (summary) {
+        // Update summary with recalculated values
+        forecast.summary = {
+          ...summary,
+          costToDate: recalculatedCostToDate,
+          earnedToDate: recalculatedEarnedToDate,
+          // Recalculate CPI with updated values
+          cpi: recalculatedCostToDate > 0 ? recalculatedEarnedToDate / recalculatedCostToDate : (summary.cpi || 0)
+        };
+      }
       if (notes !== undefined) forecast.notes = notes;
       if (status) {
         forecast.status = status;
@@ -2253,45 +2384,117 @@ const financialController = {
         .sort({ monthNumber: 1 })
         .lean();
 
-      // Build months based on actual progress reports (not job dates)
-      // Group progress reports by month and create month entries
-      // If multiple reports exist in same month, use the latest one
-      const monthMap = new Map();
+      // Build months based on FORECASTS (not progress reports)
+      // FORECASTS are the source of truth for months since forecasted cost is managed there
+      // This ensures consistency with Cost to Complete Summary which uses forecasts
+      // Match progress reports to forecast months
+      let months = [];
       
-      progressReports.forEach((pr) => {
-        const prDate = new Date(pr.reportDate);
-        const monthKey = `${prDate.getFullYear()}-${String(prDate.getMonth() + 1).padStart(2, '0')}`;
+      if (forecasts.length > 0) {
+        // Use forecasts as the source of truth
+        months = forecasts.map((forecast, index) => {
+        // Determine date range for this forecast month
+        // Use progressReportDate if available, otherwise use forecast creation date
+        let monthDate = new Date();
+        let monthEnd = new Date();
         
-        if (!monthMap.has(monthKey)) {
-          const monthStart = new Date(prDate.getFullYear(), prDate.getMonth(), 1);
-          const monthEnd = new Date(prDate.getFullYear(), prDate.getMonth() + 1, 0);
+        if (forecast.progressReportDate) {
+          monthDate = new Date(forecast.progressReportDate);
+          monthDate.setDate(1); // Start of month
+          monthEnd = new Date(forecast.progressReportDate);
+          monthEnd = new Date(monthEnd.getFullYear(), monthEnd.getMonth() + 1, 0);
           monthEnd.setHours(23, 59, 59, 999);
-          
-          monthMap.set(monthKey, {
-            date: monthStart,
-            monthEnd: monthEnd,
-            progressReport: pr,
-            reportDate: prDate
-          });
+        } else if (forecast.createdAt) {
+          monthDate = new Date(forecast.createdAt);
+          monthDate.setDate(1);
+          monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          monthEnd.setHours(23, 59, 59, 999);
         } else {
-          // If multiple reports in same month, use the latest one
-          const existing = monthMap.get(monthKey);
-          if (prDate > existing.reportDate) {
-            existing.progressReport = pr;
-            existing.reportDate = prDate;
-          }
+          // Fallback: use a default date based on monthNumber
+          // Assume job started at some point and calculate from there
+          monthDate = new Date();
+          monthDate.setMonth(monthDate.getMonth() - (forecasts.length - index - 1));
+          monthDate.setDate(1);
+          monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          monthEnd.setHours(23, 59, 59, 999);
         }
-      });
 
-      // Sort months by date and assign month numbers
-      const sortedMonths = Array.from(monthMap.values()).sort((a, b) => a.date - b.date);
-      const months = sortedMonths.map((m, index) => ({
-        monthNumber: index + 1,
-        month: `Month ${index + 1}`,
-        date: m.date,
-        monthEnd: m.monthEnd,
-        progressReport: m.progressReport
-      }));
+        // Find matching progress report for this forecast
+        let progressReport = null;
+        
+        // Strategy 1: Match by progressReportId (most accurate)
+        if (forecast.progressReportId) {
+          progressReport = progressReports.find(pr => 
+            pr._id.toString() === forecast.progressReportId.toString()
+          );
+        }
+        
+        // Strategy 2: Match by progressReportDate (fallback)
+        if (!progressReport && forecast.progressReportDate) {
+          const forecastDate = new Date(forecast.progressReportDate);
+          progressReport = progressReports.find(pr => {
+            const prDate = new Date(pr.reportDate);
+            return prDate.getFullYear() === forecastDate.getFullYear() &&
+                   prDate.getMonth() === forecastDate.getMonth();
+          });
+        }
+        
+        // Strategy 3: Match by date range (fallback)
+        if (!progressReport) {
+          progressReport = progressReports.find(pr => {
+            const prDate = new Date(pr.reportDate);
+            return prDate >= monthDate && prDate <= monthEnd;
+          });
+        }
+
+        return {
+          monthNumber: forecast.monthNumber || (index + 1),
+          month: forecast.forecastPeriod || `Month ${index + 1}`,
+          date: monthDate,
+          monthEnd: monthEnd,
+          progressReport: progressReport,
+          forecast: forecast // Store the forecast for easy access
+        };
+      });
+      } else {
+        // Fallback: If no forecasts exist, use progress reports (legacy behavior)
+        // This should rarely happen, but handle gracefully
+        const monthMap = new Map();
+        
+        progressReports.forEach((pr) => {
+          const prDate = new Date(pr.reportDate);
+          const monthKey = `${prDate.getFullYear()}-${String(prDate.getMonth() + 1).padStart(2, '0')}`;
+          
+          if (!monthMap.has(monthKey)) {
+            const monthStart = new Date(prDate.getFullYear(), prDate.getMonth(), 1);
+            const monthEnd = new Date(prDate.getFullYear(), prDate.getMonth() + 1, 0);
+            monthEnd.setHours(23, 59, 59, 999);
+            
+            monthMap.set(monthKey, {
+              date: monthStart,
+              monthEnd: monthEnd,
+              progressReport: pr,
+              reportDate: prDate
+            });
+          } else {
+            const existing = monthMap.get(monthKey);
+            if (prDate > existing.reportDate) {
+              existing.progressReport = pr;
+              existing.reportDate = prDate;
+            }
+          }
+        });
+
+        const sortedMonths = Array.from(monthMap.values()).sort((a, b) => a.date - b.date);
+        months = sortedMonths.map((m, index) => ({
+          monthNumber: index + 1,
+          month: `Month ${index + 1}`,
+          date: m.date,
+          monthEnd: m.monthEnd,
+          progressReport: m.progressReport,
+          forecast: null // No forecast available
+        }));
+      }
 
       // Build month-by-month data
       const monthData = [];
@@ -2300,47 +2503,8 @@ const financialController = {
 
       for (const month of months) {
         const progressReport = month.progressReport;
-
-        // Find forecast for this month - try multiple matching strategies
-        let forecastForMonth = null;
-        
-        // Strategy 1: Match by progressReportId (most accurate)
-        if (progressReport?._id) {
-          forecastForMonth = forecasts.find(f => 
-            f.progressReportId && f.progressReportId.toString() === progressReport._id.toString()
-          );
-        }
-        
-        // Strategy 2: Match by progressReportDate (fallback)
-        if (!forecastForMonth && progressReport?.reportDate) {
-          const reportDate = new Date(progressReport.reportDate);
-          forecastForMonth = forecasts.find(f => {
-            if (!f.progressReportDate) return false;
-            const forecastDate = new Date(f.progressReportDate);
-            // Match if dates are in the same month
-            return forecastDate.getFullYear() === reportDate.getFullYear() &&
-                   forecastDate.getMonth() === reportDate.getMonth();
-          });
-        }
-        
-        // Strategy 3: Use latest forecast up to this month's date (fallback)
-        if (!forecastForMonth) {
-          forecastForMonth = forecasts
-            .filter(f => {
-              if (f.progressReportDate) {
-                return new Date(f.progressReportDate) <= month.monthEnd;
-              }
-              // If no date, use monthNumber as fallback
-              return f.monthNumber <= month.monthNumber;
-            })
-            .sort((a, b) => {
-              // Sort by date if available, otherwise by monthNumber
-              if (a.progressReportDate && b.progressReportDate) {
-                return new Date(b.progressReportDate) - new Date(a.progressReportDate);
-              }
-              return (b.monthNumber || 0) - (a.monthNumber || 0);
-            })[0];
-        }
+        // Forecast is now directly available from the month object
+        const forecastForMonth = month.forecast;
 
         // Get costs up to end of this month
         const [timelogCosts, apCosts] = await Promise.all([
@@ -2384,82 +2548,67 @@ const financialController = {
         const actualCostThisPeriod = jobToDateCost - previousMonthCost;
 
         // Revenue recognition - totalApprovedCTD is CUMULATIVE (Complete To Date)
-        const cumulativeRecognizedRevenue = progressReport?.summary?.totalApprovedCTD?.amount || 0;
+        // If no progress report for this month, use previous month's cumulative value
+        const cumulativeRecognizedRevenue = progressReport?.summary?.totalApprovedCTD?.amount || previousRecognizedRevenue;
         const recognizedRevenueThisPeriod = cumulativeRecognizedRevenue - previousRecognizedRevenue;
         
         // Invoices - totalDueThisPeriod is incremental, but we need cumulative
+        // If no progress report for this month, use previous month's cumulative invoices
         const invoicesThisPeriod = progressReport?.summary?.totalDueThisPeriod || 0;
-        const cumulativeInvoices = previousInvoices + invoicesThisPeriod;
+        const cumulativeInvoices = progressReport ? (previousInvoices + invoicesThisPeriod) : previousInvoices;
 
-        // Forecast data
-        // Calculate forecastFinalCost from summary, or fallback to calculating from lineItems
-        // If no forecast exists, calculate realistic forecast based on actual costs and progress
+        // Forecast data - ALWAYS use forecast summary since forecasts are the source of truth
+        // Since months are now built from forecasts, every month should have a forecast
         let forecastedFinalCost = 0;
+        let forecastedFinalValue = forecastedJobValue;
+        
         if (forecastForMonth) {
+          // Primary: Use forecast summary (most accurate)
           if (forecastForMonth.summary?.forecastFinalCost) {
             forecastedFinalCost = forecastForMonth.summary.forecastFinalCost;
           } else if (forecastForMonth.lineItems && forecastForMonth.lineItems.length > 0) {
-            // Fallback: calculate from lineItems
+            // Fallback: Calculate from lineItems
             forecastedFinalCost = forecastForMonth.lineItems.reduce((sum, item) => 
               sum + (item.forecastedFinalCost || item.totalCost || 0), 0
             );
           }
+          
+          // Get forecasted final value
+          if (forecastForMonth.summary?.forecastFinalValue) {
+            forecastedFinalValue = forecastForMonth.summary.forecastFinalValue;
+          } else if (forecastForMonth.lineItems && forecastForMonth.lineItems.length > 0) {
+            forecastedFinalValue = forecastForMonth.lineItems.reduce((sum, item) => 
+              sum + (item.forecastedFinalValue || item.totalValue || 0), 0
+            ) || forecastedJobValue;
+          }
         } else {
-          // No forecast exists - calculate realistic forecast based on actual costs and progress
+          // This should not happen since months are built from forecasts
+          // But handle gracefully: use previous month's forecast or calculate from progress
+          console.warn(`No forecast found for month ${month.monthNumber} - using fallback calculation`);
           const progressPercent = cumulativeRecognizedRevenue > 0 && forecastedJobValue > 0
             ? (cumulativeRecognizedRevenue / forecastedJobValue) * 100
             : 0;
           
           if (progressPercent > 0 && jobToDateCost > 0 && cumulativeRecognizedRevenue > 0) {
-            // Calculate CPI (Cost Performance Index)
             const cpi = cumulativeRecognizedRevenue / jobToDateCost;
-            
-            // Calculate remaining work
-            const remainingValue = forecastedJobValue - cumulativeRecognizedRevenue;
             const remainingProgressPercent = 100 - progressPercent;
             
             if (cpi > 0 && remainingProgressPercent > 0) {
-              // Realistic forecast: cost to date + remaining work adjusted by performance
-              // If CPI < 1, we're spending more than planned, so forecast higher
-              // If CPI > 1, we're spending less than planned, so forecast lower
               const remainingCostAtCurrentRate = (jobToDateCost / progressPercent) * remainingProgressPercent;
               forecastedFinalCost = jobToDateCost + (remainingCostAtCurrentRate / cpi);
             } else {
-              // Fallback: extrapolate from current spending rate
               forecastedFinalCost = jobToDateCost / (progressPercent / 100);
             }
-            
-            // CRITICAL: Ensure forecast is ALWAYS at least cost to date (can't forecast less than already spent)
-            forecastedFinalCost = Math.max(forecastedFinalCost, jobToDateCost * 1.05); // Add 5% buffer minimum
-            
-            // If we're already over budget, forecast should reflect that
-            const estimatedBudget = forecastedJobValue * 0.9; // Assume 10% margin
-            if (jobToDateCost > estimatedBudget) {
-              // We're over budget - forecast should be cost to date + remaining work at current rate
-              const overrunPercent = (jobToDateCost / estimatedBudget) - 1;
-              const remainingCostAtBudget = estimatedBudget - (estimatedBudget * (progressPercent / 100));
-              forecastedFinalCost = jobToDateCost + (remainingCostAtBudget * (1 + overrunPercent));
-            }
-            
-            // Cap forecast at reasonable maximum (max 200% of estimated budget for very troubled projects)
-            const maxForecast = estimatedBudget * 2.0;
-            forecastedFinalCost = Math.min(forecastedFinalCost, maxForecast);
+            forecastedFinalCost = Math.max(forecastedFinalCost, jobToDateCost * 1.05);
           } else {
-            // No progress yet - use estimated budget (90% of contract value as typical margin)
             forecastedFinalCost = forecastedJobValue * 0.9;
           }
         }
         
         // Final safety check: forecast must be >= cost to date
         if (forecastedFinalCost < jobToDateCost) {
-          // If forecast is somehow less than cost to date, set it to cost to date + 10% buffer
           forecastedFinalCost = jobToDateCost * 1.1;
         }
-        
-        const forecastedFinalValue = forecastForMonth?.summary?.forecastFinalValue || 
-          (forecastForMonth?.lineItems?.reduce((sum, item) => 
-            sum + (item.forecastedFinalValue || item.totalValue || 0), 0
-          ) || forecastedJobValue);
         const forecastedFee = forecastedFinalValue - forecastedFinalCost;
         const forecastedFeePercent = forecastedFinalValue > 0 ? (forecastedFee / forecastedFinalValue) * 100 : 0;
 
