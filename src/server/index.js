@@ -213,6 +213,30 @@ app.use('/api/users', userRoutes);
 app.use('/api/sov', sovRoutes);
 app.use('/api/financial', financialRoutes);
 
+// Version endpoint
+app.get('/api/version', (req, res) => {
+  try {
+    const packageJson = require('../../package.json');
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+    const environment = isProduction ? 'production' : 'development';
+    
+    res.json({
+      success: true,
+      version: packageJson.version,
+      environment,
+      buildTime: process.env.BUILD_TIME || new Date().toISOString(),
+      nodeEnv: process.env.NODE_ENV || 'development',
+      vercel: !!process.env.VERCEL
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get version information',
+      error: error.message
+    });
+  }
+});
+
 // Health check endpoint with connection verification
 app.get('/api/health', async (req, res) => {
   try {
@@ -225,11 +249,15 @@ app.get('/api/health', async (req, res) => {
     // Test a simple query to verify connection works
     const connectionTest = mongoose.connection.readyState === 1;
     
+    const packageJson = require('../../package.json');
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+    
     res.json({
       success: true,
       message: 'Appello Task Management API is running',
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
+      version: packageJson.version,
+      environment: isProduction ? 'production' : 'development',
       database: {
         status: dbStatus,
         readyState: mongoose.connection.readyState,

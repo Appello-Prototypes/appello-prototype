@@ -1,6 +1,6 @@
 {
   "name": "appello-task-management",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Task management module for Appello ICI contractor platform",
   "main": "src/index.js",
   "scripts": {

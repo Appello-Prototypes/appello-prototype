@@ -29,7 +29,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api|socket.io|_next|.*\\..*).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],

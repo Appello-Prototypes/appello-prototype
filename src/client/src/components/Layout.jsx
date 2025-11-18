@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   HomeIcon,
@@ -12,6 +12,7 @@ import {
   BellIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
+import { versionAPI } from '../services/api'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
@@ -25,10 +26,24 @@ const navigation = [
 
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [versionInfo, setVersionInfo] = useState(null)
   const location = useLocation()
   
   // Mock user for demo purposes
   const user = { name: 'Demo User', role: 'admin' }
+
+  // Fetch version information
+  useEffect(() => {
+    versionAPI.getVersion()
+      .then(response => {
+        if (response.data.success) {
+          setVersionInfo(response.data)
+        }
+      })
+      .catch(error => {
+        console.error('Failed to fetch version:', error)
+      })
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -41,7 +56,14 @@ export default function Layout({ children }) {
               <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">A</span>
               </div>
-              <span className="ml-2 text-lg font-semibold text-gray-900">Appello Tasks</span>
+              <div className="ml-2">
+                <span className="text-lg font-semibold text-gray-900">Appello Tasks</span>
+                {versionInfo && (
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    v{versionInfo.version} ({versionInfo.environment})
+                  </div>
+                )}
+              </div>
             </div>
             <button
               type="button"
@@ -85,7 +107,14 @@ export default function Layout({ children }) {
             <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">A</span>
             </div>
-            <span className="ml-2 text-lg font-semibold text-gray-900">Appello Tasks</span>
+            <div className="ml-2 flex-1">
+              <span className="text-lg font-semibold text-gray-900">Appello Tasks</span>
+              {versionInfo && (
+                <div className="text-xs text-gray-500 mt-0.5">
+                  v{versionInfo.version} ({versionInfo.environment})
+                </div>
+              )}
+            </div>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">
             {navigation.map((item) => {
@@ -127,6 +156,13 @@ export default function Layout({ children }) {
             </button>
             
             <div className="flex items-center space-x-4">
+              {versionInfo && (
+                <div className="hidden sm:flex items-center text-xs text-gray-500">
+                  <span className="px-2 py-1 bg-gray-100 rounded">
+                    v{versionInfo.version} ({versionInfo.environment})
+                  </span>
+                </div>
+              )}
               <button
                 type="button"
                 className="text-gray-400 hover:text-gray-500 relative"

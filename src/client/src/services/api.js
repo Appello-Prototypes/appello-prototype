@@ -167,4 +167,11 @@ export const fileAPI = {
   },
 }
 
+// Version API functions
+export const versionAPI = {
+  getVersion: () => {
+    return api.get('/api/version')
+  },
+}
+
 export default api
