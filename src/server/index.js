@@ -152,7 +152,6 @@ const connectDB = async () => {
 
   // Store the URI we're connecting to
   cached.uri = mongoUri;
-  const isLocalMongo = mongoUri.startsWith('mongodb://localhost') || mongoUri.startsWith('mongodb://127.0.0.1');
   cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
     console.log(`✅ Connected to ${isLocalMongo ? 'Local MongoDB' : 'MongoDB Atlas'}`);
     cached.conn = mongoose;
