@@ -25,10 +25,12 @@
     {
       "src": "/socket.io/(.*)",
       "dest": "/src/server/index.js"
-    },
+    }
+  ],
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/src/client/dist/$1"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "env": {
