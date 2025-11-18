@@ -558,16 +558,20 @@ const financialController = {
       }
 
       // Get latest approved progress report for accurate earned value
+      // IMPORTANT: Always use the absolute latest progress report (regardless of reportDate parameter)
+      // This ensures EV is based on the most recent completion percentage
       const latestProgressReport = await ProgressReport.findOne({
         jobId: jobObjectId,
-        status: 'approved',
-        reportDate: { $lte: reportDate }
+        status: 'approved'
       })
         .sort({ reportDate: -1 })
         .populate({
           path: 'lineItems.scheduleOfValuesId',
           populate: ['areaId', 'systemId', 'phaseId']
         });
+      
+      // Use reportDate only for cost filtering, not for progress report selection
+      // This ensures we always use the latest completion % but filter costs appropriately
 
       // Get SOV line items grouped by Area/System (matching progress report structure)
       const sovLineItems = await ScheduleOfValues.find({ jobId: jobObjectId })
@@ -940,6 +944,9 @@ const financialController = {
       });
 
       // Calculate project-level EVM metrics
+      // NOTE: totalEV is calculated from the latest progress report's approved CTD amounts
+      // This ensures EV always reflects the most recent completion percentage (e.g., 86.45%)
+      // regardless of the reportDate parameter used for cost filtering
       const projectCV = totalEV - totalAC;
       const projectCPI = totalAC > 0 ? totalEV / totalAC : 0;
       const projectEAC = projectCPI > 0 ? totalBAC / projectCPI : totalBAC;
@@ -1576,10 +1583,12 @@ const financialController = {
       ]);
 
       // Get TimelogRegister costs grouped by month and cost code
+      // IMPORTANT: Only include approved entries to match Earned vs Burned calculation
       const laborCosts = await TimelogRegister.aggregate([
         {
           $match: {
             jobId: jobObjectId,
+            status: 'approved', // Only approved entries to match CPI calculation
             workDate: { $gte: startDate, $lte: endDate }
           }
         },
