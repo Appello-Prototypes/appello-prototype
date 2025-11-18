@@ -26,22 +26,26 @@ const navigation = [
 
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [versionInfo, setVersionInfo] = useState(null)
+  const [versionInfo, setVersionInfo] = useState({
+    version: '1.1.0',
+    environment: typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'production' : 'development'
+  })
   const location = useLocation()
   
   // Mock user for demo purposes
   const user = { name: 'Demo User', role: 'admin' }
 
-  // Fetch version information
+  // Fetch version information from API (with fallback)
   useEffect(() => {
     versionAPI.getVersion()
       .then(response => {
-        if (response.data.success) {
+        if (response.data && response.data.success) {
           setVersionInfo(response.data)
         }
       })
       .catch(error => {
-        console.error('Failed to fetch version:', error)
+        console.error('Failed to fetch version from API, using fallback:', error)
+        // Keep the fallback version already set in useState
       })
   }, [])
 
