@@ -198,25 +198,16 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
-// API Routes with connection check for serverless AND local development
-// Always ensure DB connection for routes that need it (except version and fast-stats)
-app.use('/api/projects', ensureDBConnection);
-app.use('/api/jobs', ensureDBConnection);
-app.use('/api/tasks', ensureDBConnection);
-app.use('/api/time-entries', ensureDBConnection);
-app.use('/api/users', ensureDBConnection);
-app.use('/api/sov', ensureDBConnection);
-app.use('/api/financial', ensureDBConnection);
-app.use('/api/auth', ensureDBConnection);
-
-app.use('/api/auth', authRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/jobs', jobRoutes);
-app.use('/api/time-entries', timeEntryRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/sov', sovRoutes);
-app.use('/api/financial', financialRoutes);
+// API Routes - apply DB connection middleware before routes that need it
+// Note: /api/version and /api/fast-stats don't need DB connection
+app.use('/api/auth', ensureDBConnection, authRoutes);
+app.use('/api/tasks', ensureDBConnection, taskRoutes);
+app.use('/api/projects', ensureDBConnection, projectRoutes);
+app.use('/api/jobs', ensureDBConnection, jobRoutes);
+app.use('/api/time-entries', ensureDBConnection, timeEntryRoutes);
+app.use('/api/users', ensureDBConnection, userRoutes);
+app.use('/api/sov', ensureDBConnection, sovRoutes);
+app.use('/api/financial', ensureDBConnection, financialRoutes);
 
 // Version endpoint
 app.get('/api/version', (req, res) => {
