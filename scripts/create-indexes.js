@@ -37,48 +37,120 @@ async function createIndexes() {
 
     // User indexes
     console.log('👤 Users...');
-    await User.createIndexes();
-    console.log('   ✅ User indexes created');
+    try {
+      await User.createIndexes();
+      console.log('   ✅ User indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ User indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // Task indexes
     console.log('📋 Tasks...');
-    await Task.createIndexes();
-    console.log('   ✅ Task indexes created');
+    try {
+      await Task.createIndexes();
+      console.log('   ✅ Task indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ Task indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // Project indexes
     console.log('🏗️  Projects...');
-    await Project.createIndexes();
-    console.log('   ✅ Project indexes created');
+    try {
+      await Project.createIndexes();
+      console.log('   ✅ Project indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ Project indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // Job indexes
     console.log('💼 Jobs...');
-    await Job.createIndexes();
-    console.log('   ✅ Job indexes created');
+    try {
+      await Job.createIndexes();
+      console.log('   ✅ Job indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ Job indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // TimeEntry indexes
     console.log('⏰ Time Entries...');
-    await TimeEntry.createIndexes();
-    console.log('   ✅ TimeEntry indexes created');
+    try {
+      await TimeEntry.createIndexes();
+      console.log('   ✅ TimeEntry indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ TimeEntry indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // ScheduleOfValues indexes
     console.log('💰 Schedule of Values...');
-    await ScheduleOfValues.createIndexes();
-    console.log('   ✅ SOV indexes created');
+    try {
+      await ScheduleOfValues.createIndexes();
+      console.log('   ✅ SOV indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ SOV indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // ProgressReport indexes
     console.log('📊 Progress Reports...');
-    await ProgressReport.createIndexes();
-    console.log('   ✅ ProgressReport indexes created');
+    try {
+      await ProgressReport.createIndexes();
+      console.log('   ✅ ProgressReport indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ ProgressReport indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // APRegister indexes
     console.log('📄 AP Register...');
-    await APRegister.createIndexes();
-    console.log('   ✅ APRegister indexes created');
+    try {
+      await APRegister.createIndexes();
+      console.log('   ✅ APRegister indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ APRegister indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     // TimelogRegister indexes
     console.log('📝 Timelog Register...');
-    await TimelogRegister.createIndexes();
-    console.log('   ✅ TimelogRegister indexes created');
+    try {
+      await TimelogRegister.createIndexes();
+      console.log('   ✅ TimelogRegister indexes created');
+    } catch (error) {
+      if (error.code === 86 || error.message.includes('existing index')) {
+        console.log('   ✓ TimelogRegister indexes already exist');
+      } else {
+        throw error;
+      }
+    }
 
     console.log('\n✅ All indexes created successfully!\n');
 

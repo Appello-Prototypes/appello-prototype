@@ -46,13 +46,33 @@ async function syncSchema(sourceUri, targetUri, sourceName, targetName) {
 
       console.log(`\n📦 Syncing collection: ${collectionName}`);
 
-      // Get indexes from source
-      const sourceIndexes = await sourceConn.db.collection(collectionName).indexes();
-      console.log(`   Found ${sourceIndexes.length} indexes`);
+      // Check if collection exists in source
+      const sourceCollections = await sourceConn.db.listCollections({ name: collectionName }).toArray();
+      if (sourceCollections.length === 0) {
+        console.log(`   ⚠️  Collection doesn't exist in source, skipping`);
+        continue;
+      }
 
-      // Get existing indexes from target
-      const targetIndexes = await targetConn.db.collection(collectionName).indexes();
-      const targetIndexKeys = targetIndexes.map(idx => JSON.stringify(idx.key));
+      // Get indexes from source
+      let sourceIndexes;
+      try {
+        sourceIndexes = await sourceConn.db.collection(collectionName).indexes();
+        console.log(`   Found ${sourceIndexes.length} indexes`);
+      } catch (error) {
+        console.log(`   ⚠️  Could not get indexes: ${error.message}`);
+        continue;
+      }
+
+      // Get existing indexes from target (collection may not exist yet)
+      let targetIndexes = [];
+      let targetIndexKeys = [];
+      try {
+        targetIndexes = await targetConn.db.collection(collectionName).indexes();
+        targetIndexKeys = targetIndexes.map(idx => JSON.stringify(idx.key));
+      } catch (error) {
+        // Collection doesn't exist yet, that's okay - we'll create it with indexes
+        console.log(`   ℹ️  Collection doesn't exist in target yet, will create with indexes`);
+      }
 
       // Create missing indexes in target
       for (const index of sourceIndexes) {
