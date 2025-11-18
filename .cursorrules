@@ -1,0 +1,316 @@
+# Cursor Rules - Appello Task Management
+
+## Project Overview
+
+This is a task management system for ICI (Industrial, Commercial, Institutional) subcontractors, built as a module for the Appello platform.
+
+**Tech Stack:**
+- Backend: Node.js + Express (serverless on Vercel)
+- Frontend: React + Vite + Tailwind CSS
+- Database: MongoDB Atlas
+- Deployment: Vercel (auto-deploys from GitHub)
+- Testing: Playwright E2E tests
+
+**Repository:** https://github.com/Appello-Prototypes/appello-prototype
+
+## Critical Architecture Decisions
+
+### Database Strategy
+
+**IMPORTANT: Separate databases for dev and prod**
+
+- **Production Database**: `appello-tasks-prod` (used by Vercel)
+- **Development Database**: `appello-tasks-dev` (used for local development)
+- **Automatic Selection**: Server automatically selects database based on environment
+  - Local: Uses `MONGODB_DEV_URI` from `.env.local`
+  - Production: Uses `MONGODB_URI` from Vercel environment variables
+
+**NEVER modify production database from local development!**
+
+### Environment Variables
+
+**Local Development (.env.local):**
+- `MONGODB_DEV_URI` - Development database (appello-tasks-dev)
+- `MONGODB_URI` - Production database (read-only, for schema sync)
+- `NODE_ENV=development`
+
+**Production (Vercel):**
+- `MONGODB_URI` - Production database (appello-tasks-prod)
+- `NODE_ENV=production`
+- `JWT_SECRET` - Production JWT secret
+- Other required vars (see DEPLOYMENT_WORKFLOW.md)
+
+### Deployment Workflow
+
+**Always follow this process:**
+
+1. **Local Development**
+   - Make changes locally
+   - Test with dev database (`appello-tasks-dev`)
+   - Run E2E tests: `npm run test:e2e:local`
+
+2. **Schema Sync** (if schema changed)
+   - Sync from prod to dev: `npm run db:sync`
+   - Create indexes: `npm run db:indexes`
+
+3. **Commit and Push**
+   - Commit changes
+   - Push to GitHub: `git push origin main`
+   - Vercel auto-deploys from GitHub
+
+4. **Production Testing**
+   - Test production: `npm run test:e2e:production`
+   - Verify deployment in Vercel dashboard
+
+**NEVER deploy directly via Vercel CLI - always push to GitHub first!**
+
+## Key Files and Their Purposes
+
+### Configuration Files
+- `vercel.json` - Vercel deployment configuration
+- `.env.local` - Local environment variables (NOT committed)
+- `env.example` - Example environment variables
+- `package.json` - Dependencies and scripts
+
+### Database Scripts
+- `scripts/sync-db-schema.js` - Sync schema from prod to dev
+- `scripts/create-indexes.js` - Create/update database indexes
+- `scripts/verify-db-setup.js` - Verify database configuration
+- `scripts/test-foundation.sh` - Test foundation setup
+
+### Server Code
+- `src/server/index.js` - Main server file (handles DB selection)
+- `src/server/models/` - Mongoose models
+- `src/server/controllers/` - Request handlers
+- `src/server/routes/` - API routes
+
+### Client Code
+- `src/client/src/App.jsx` - Main React app with routes
+- `src/client/src/pages/` - Page components
+- `src/client/src/services/api.js` - API client (auto-detects prod/dev)
+
+### Testing
+- `tests/e2e/` - Playwright E2E tests
+- `playwright.config.js` - Playwright configuration (local + production)
+
+### Documentation
+- `DEPLOYMENT_WORKFLOW.md` - Complete deployment process
+- `DATABASE_SETUP.md` - Database configuration guide
+- `FOUNDATION_SETUP.md` - Foundation checklist
+- `VERCEL_DEPLOYMENT.md` - Vercel-specific deployment guide
+
+## Important Commands
+
+### Database Management
+```bash
+# Verify database setup
+node scripts/verify-db-setup.js
+
+# Sync schema from prod to dev
+npm run db:sync
+
+# Create/update indexes
+npm run db:indexes
+
+# Test foundation
+./scripts/test-foundation.sh
+```
+
+### Development
+```bash
+# Start local development (uses dev database)
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server locally
+npm start
+```
+
+### Testing
+```bash
+# Run all E2E tests (local + production)
+npm run test:e2e
+
+# Test local only
+npm run test:e2e:local
+
+# Test production only
+npm run test:e2e:production
+
+# Test with UI
+npm run test:e2e:ui
+
+# View test report
+npm run test:e2e:report
+```
+
+### Deployment
+```bash
+# Deploy to production (via GitHub)
+git push origin main  # Auto-deploys to Vercel
+
+# Check deployment status
+vercel ls
+
+# View environment variables
+vercel env ls
+```
+
+## Code Patterns and Conventions
+
+### Database Connection
+- Server automatically selects database based on environment
+- Uses cached connection pattern for serverless (Vercel)
+- Connection logging shows which database is being used
+
+### API Routes
+- All API routes under `/api/*`
+- Routes defined in `src/server/routes/`
+- Controllers in `src/server/controllers/`
+
+### Frontend API Client
+- Auto-detects production vs development
+- Uses `window.location.hostname` to determine environment
+- Falls back to `VITE_API_URL` or `http://localhost:3001` for local
+
+### Error Handling
+- API errors return consistent format: `{success: false, message: "...", error: "..."}`
+- Health endpoint: `/api/health` returns connection status
+
+## Testing Guidelines
+
+### E2E Tests
+- Test both local and production environments
+- Compare performance between environments
+- Handle 503 errors gracefully (cold starts)
+- Generate comparison reports
+
+### Test Structure
+- `tests/e2e/dashboard.spec.js` - Dashboard tests
+- `tests/e2e/navigation.spec.js` - Navigation tests
+- `tests/e2e/api-health.spec.js` - API health tests
+- `tests/e2e/performance.spec.js` - Performance tests
+- `tests/e2e/comparison.spec.js` - Environment comparison
+
+## Best Practices
+
+### Before Making Changes
+1. ✅ Verify database setup: `node scripts/verify-db-setup.js`
+2. ✅ Ensure using dev database locally
+3. ✅ Sync schema if needed: `npm run db:sync`
+4. ✅ Test locally first
+
+### When Deploying
+1. ✅ All local tests pass
+2. ✅ Schema synced (if changed)
+3. ✅ Code committed and pushed to GitHub
+4. ✅ Verify Vercel environment variables
+5. ✅ Test production after deployment
+
+### Database Changes
+1. ✅ Make changes in development database first
+2. ✅ Test thoroughly
+3. ✅ Sync schema to production: `npm run db:sync prod-to-dev` (then manually apply to prod)
+4. ✅ Create indexes: `npm run db:indexes`
+5. ✅ Verify both databases match
+
+### Code Changes
+1. ✅ Test locally with dev database
+2. ✅ Run E2E tests: `npm run test:e2e:local`
+3. ✅ Commit and push to GitHub
+4. ✅ Verify production deployment
+5. ✅ Run E2E tests: `npm run test:e2e:production`
+
+## Common Issues and Solutions
+
+### Database Connection Issues
+- **Problem**: "MONGODB_DEV_URI not set"
+- **Solution**: Create `.env.local` with `MONGODB_DEV_URI` pointing to dev database
+
+### Schema Out of Sync
+- **Problem**: Local queries fail, indexes missing
+- **Solution**: Run `npm run db:sync` then `npm run db:indexes`
+
+### Production API Returns 503
+- **Problem**: Production health check returns 503
+- **Solution**: 
+  1. Check Vercel environment variables
+  2. Verify `MONGODB_URI` is set correctly
+  3. Check MongoDB Atlas network access
+  4. Review Vercel function logs
+
+### E2E Tests Fail
+- **Problem**: Tests timeout or fail
+- **Solution**:
+  1. Ensure local server is running (`npm run dev`)
+  2. Check database connections
+  3. Verify environment variables
+  4. Review test logs and screenshots
+
+## Project Structure
+
+```
+task-management/
+├── src/
+│   ├── server/          # Backend (Express + MongoDB)
+│   │   ├── models/      # Mongoose models
+│   │   ├── controllers/ # Request handlers
+│   │   ├── routes/      # API routes
+│   │   └── index.js     # Main server file
+│   └── client/          # Frontend (React + Vite)
+│       └── src/
+│           ├── pages/   # Page components
+│           ├── components/ # Reusable components
+│           └── services/api.js # API client
+├── scripts/             # Database and utility scripts
+├── tests/e2e/          # Playwright E2E tests
+├── vercel.json         # Vercel configuration
+└── .env.local          # Local environment (NOT committed)
+```
+
+## Key Models
+
+- **User** - User accounts and authentication
+- **Task** - Task management
+- **Project** - Project management
+- **Job** - Job/work order management
+- **TimeEntry** - Time tracking
+- **ScheduleOfValues** - SOV line items
+- **ProgressReport** - Progress reporting
+- **APRegister** - Accounts payable
+- **TimelogRegister** - Time log register
+
+## Important URLs
+
+- **Production**: https://appello-prototype.vercel.app
+- **GitHub**: https://github.com/Appello-Prototypes/appello-prototype
+- **Vercel Dashboard**: https://vercel.com/dashboard
+
+## Remember
+
+1. **Always use dev database for local development**
+2. **Never modify production database from local**
+3. **Sync schema FROM prod TO dev, never reverse**
+4. **Test locally before deploying**
+5. **Deploy via GitHub, not directly via Vercel CLI**
+6. **Run E2E tests to verify both environments match**
+7. **Keep documentation updated when making changes**
+
+## When Starting Work
+
+1. Check foundation status: `node scripts/verify-db-setup.js`
+2. Verify using dev database: Check `.env.local`
+3. Sync schema if needed: `npm run db:sync`
+4. Start development: `npm run dev`
+5. Test changes: `npm run test:e2e:local`
+
+## When Deploying
+
+1. Verify all tests pass locally
+2. Commit and push to GitHub
+3. Monitor Vercel deployment
+4. Test production: `npm run test:e2e:production`
+5. Verify comparison report shows environments match
+
