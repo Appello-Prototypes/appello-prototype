@@ -88,25 +88,33 @@ const connectDB = async () => {
   
   // CRITICAL FIX: Check if already connected to the CORRECT database
   // Don't just check readyState - verify it's the right URI!
-  if (mongoose.connection.readyState === 1 && cached.uri === mongoUri) {
-    // Connection is ready AND it's the correct database
-    return mongoose.connection;
-  }
-
-  // If connected to wrong database, disconnect first
-  if (mongoose.connection.readyState === 1 && cached.uri !== mongoUri) {
-    console.log('⚠️  Connected to different database, reconnecting...');
-    await mongoose.connection.close();
-    cached.conn = null;
-    cached.uri = null;
+  if (mongoose.connection.readyState === 1) {
+    // If cached.uri matches, we're good
+    if (cached.uri === mongoUri) {
+      return mongoose.connection;
+    }
+    // If cached.uri is null but we're connected, set it (first connection after startup)
+    if (!cached.uri && mongoose.connection.readyState === 1) {
+      cached.uri = mongoUri;
+      return mongoose.connection;
+    }
+    // If cached.uri doesn't match, we need to reconnect
+    if (cached.uri && cached.uri !== mongoUri) {
+      console.log('⚠️  Connected to different database, reconnecting...');
+      await mongoose.connection.close();
+      cached.conn = null;
+      cached.uri = null;
+    }
   }
 
   // If connection is in progress, wait for it (but with timeout)
   if (cached.promise && cached.uri === mongoUri) {
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging - shorter timeout for local MongoDB
+      const isLocalMongo = mongoUri.startsWith('mongodb://localhost') || mongoUri.startsWith('mongodb://127.0.0.1');
+      const timeoutMs = isLocalMongo ? 2000 : 10000;
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+        setTimeout(() => reject(new Error('Connection timeout')), timeoutMs)
       );
       return await Promise.race([cached.promise, timeoutPromise]);
     } catch (error) {
@@ -237,6 +245,7 @@ app.set('io', io);
 // Middleware to ensure DB connection before handling requests (serverless)
 // Optimized: Fast path if already connected
 const ensureDBConnection = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     // Use same logic as connectDB to determine which database to use
     let mongoUri;
@@ -252,14 +261,24 @@ const ensureDBConnection = async (req, res, next) => {
       }
     }
     
+    const checkTime = Date.now() - startTime;
+    
     // Fast path: If already connected to correct database, skip connection check
     if (mongoose.connection.readyState === 1 && cached.uri === mongoUri) {
       // Already connected to correct database, proceed immediately
+      if (checkTime > 10) {
+        console.log(`⚠️  DB middleware check took ${checkTime}ms (should be <1ms)`);
+      }
       return next();
     }
     
     // Otherwise, ensure connection
+    const connectStart = Date.now();
     await connectDB();
+    const connectTime = Date.now() - connectStart;
+    if (connectTime > 100) {
+      console.log(`⚠️  DB connection took ${connectTime}ms`);
+    }
     next();
   } catch (error) {
     console.error('Database connection failed in middleware:', error.message);

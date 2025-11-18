@@ -15,6 +15,7 @@ const { validationResult } = require('express-validator');
 const jobController = {
   // GET /api/jobs
   getAllJobs: async (req, res) => {
+    const startTime = Date.now();
     try {
       const { status, jobManager, projectId } = req.query;
       
@@ -23,6 +24,7 @@ const jobController = {
       if (jobManager) filter.jobManager = jobManager;
       if (projectId) filter.projectId = projectId;
       
+      const queryStart = Date.now();
       // Simplified query - only populate essential fields for list view
       // Use lean for faster queries and handle populate errors gracefully
       const jobs = await Job.find(filter)
@@ -32,6 +34,13 @@ const jobController = {
         .sort({ createdAt: -1 })
         .lean() // Use lean for faster queries
         .maxTimeMS(process.env.NODE_ENV === 'production' ? 10000 : 5000); // 5s for local, 10s for prod
+      
+      const queryTime = Date.now() - queryStart;
+      const totalTime = Date.now() - startTime;
+      
+      if (queryTime > 100 || totalTime > 500) {
+        console.log(`⚠️  getAllJobs: query=${queryTime}ms, total=${totalTime}ms`);
+      }
       
       res.json({
         success: true,
