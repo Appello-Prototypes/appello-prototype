@@ -328,7 +328,7 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // Middleware to ensure DB connection before handling requests (serverless)
-// Optimized: Fast path if already connected
+// Optimized: Fast path if already connected, with timeout handling for cold starts
 const ensureDBConnection = async (req, res, next) => {
   const startTime = Date.now();
   try {
@@ -365,21 +365,42 @@ const ensureDBConnection = async (req, res, next) => {
       return next();
     }
     
-    // Otherwise, ensure connection
+    // Otherwise, ensure connection with timeout for cold starts
     const connectStart = Date.now();
-    await connectDB();
+    const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+    const connectionTimeout = isVercel ? 15000 : 10000; // 15s for Vercel, 10s for local
+    
+    const connectionPromise = connectDB();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database connection timeout - cold start may be slow')), connectionTimeout)
+    );
+    
+    await Promise.race([connectionPromise, timeoutPromise]);
+    
     const connectTime = Date.now() - connectStart;
     if (connectTime > 100) {
       console.log(`⚠️  DB connection took ${connectTime}ms`);
     }
     next();
   } catch (error) {
-    console.error('❌ Database connection failed in middleware:', error.message);
+    const elapsedTime = Date.now() - startTime;
+    console.error(`❌ Database connection failed in middleware after ${elapsedTime}ms:`, error.message);
     console.error('Stack:', error.stack);
-    res.status(503).json({
+    console.error('Request path:', req.path);
+    console.error('Connection state:', mongoose.connection.readyState);
+    
+    // Return 503 for timeout/connection errors (retryable)
+    // Return 500 for configuration errors (not retryable)
+    const isTimeout = error.message.includes('timeout') || error.message.includes('Timeout');
+    const statusCode = isTimeout ? 503 : 500;
+    
+    res.status(statusCode).json({
       success: false,
-      message: 'Database connection unavailable',
-      error: process.env.NODE_ENV === 'development' || process.env.VERCEL ? error.message : 'Service temporarily unavailable'
+      message: isTimeout 
+        ? 'Database connection timeout - please retry' 
+        : 'Database connection unavailable',
+      error: process.env.NODE_ENV === 'development' || process.env.VERCEL ? error.message : 'Service temporarily unavailable',
+      retryable: isTimeout
     });
   }
 };
