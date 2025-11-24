@@ -68,6 +68,13 @@ const JobLayout = () => {
           icon: HomeIcon,
           path: `/jobs/${jobId}`,
           description: 'Job dashboard and summary'
+        },
+        {
+          id: 'specifications',
+          name: 'Specifications',
+          icon: DocumentTextIcon,
+          path: `/jobs/${jobId}/specifications`,
+          description: 'Product selection specifications for systems and areas'
         }
       ]
     },

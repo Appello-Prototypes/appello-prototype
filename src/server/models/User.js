@@ -16,7 +16,10 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      // Password not required if user has Google OAuth
+      return !this.googleOAuth || !this.googleOAuth.refreshToken;
+    },
     minlength: 6
   },
   
@@ -129,7 +132,17 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
-  }]
+  }],
+
+  // Google OAuth2 Integration for Gmail
+  googleOAuth: {
+    accessToken: String,
+    refreshToken: String,
+    tokenExpiry: Date,
+    email: String, // Google account email
+    connectedAt: Date,
+    scope: String // Gmail API scopes
+  }
 }, {
   timestamps: true,
   toJSON: { 
@@ -158,8 +171,15 @@ userSchema.virtual('initials').get(function() {
 
 // Pre-save middleware to hash password
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
-  if (!this.isModified('password')) return next();
+  // Skip password hashing if user has Google OAuth and no password
+  if (this.googleOAuth?.refreshToken && !this.password) {
+    return next();
+  }
+
+  // Only hash the password if it has been modified (or is new) and exists
+  if (!this.isModified('password') || !this.password) {
+    return next();
+  }
   
   try {
     // Hash password with cost of 12

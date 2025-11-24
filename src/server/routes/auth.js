@@ -1,6 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
+const googleAuthController = require('../controllers/googleAuthController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -76,8 +77,10 @@ const profileValidation = [
 ];
 
 // Public routes
-router.post('/login', loginValidation, authController.login);
+router.post('/login', loginValidation, authController.login); // Keep for backward compatibility
 router.post('/register', registerValidation, authController.register);
+router.get('/google/connect', googleAuthController.initiateConnection); // Public route for login
+router.get('/google/callback', googleAuthController.handleCallback); // Public route for OAuth callback
 
 // Protected routes
 router.use(auth); // Apply authentication middleware to all routes below
@@ -87,5 +90,9 @@ router.post('/logout', authController.logout);
 router.post('/refresh', authController.refreshToken);
 router.put('/change-password', changePasswordValidation, authController.changePassword);
 router.put('/profile', profileValidation, authController.updateProfile);
+
+// Google OAuth routes (protected - for email connection)
+router.get('/google/status', googleAuthController.getConnectionStatus);
+router.post('/google/disconnect', googleAuthController.disconnect);
 
 module.exports = router;

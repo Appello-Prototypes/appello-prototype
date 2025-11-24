@@ -29,9 +29,15 @@ export const api = axios.create({
   withCredentials: false,
 })
 
-// Request interceptor - with logging for debugging
+// Request interceptor - add auth token and logging
 api.interceptors.request.use(
   (config) => {
+    // Add authentication token if available
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     // Log request details in development
     if (import.meta.env.DEV) {
       const fullURL = config.baseURL 
@@ -47,12 +53,29 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor - enhanced error logging
+// Response interceptor - handle auth errors and enhanced error logging
 api.interceptors.response.use(
   (response) => {
+    // Store token if provided in response (login/register)
+    if (response.data?.token) {
+      localStorage.setItem('authToken', response.data.token);
+    }
     return response
   },
   (error) => {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken');
+      // Don't redirect if already on login page or if it's a public route
+      const isPublicRoute = error.config?.url?.includes('/auth/login') || 
+                           error.config?.url?.includes('/auth/register') ||
+                           error.config?.url?.includes('/auth/google/callback');
+      if (!isPublicRoute && window.location.pathname !== '/login') {
+        // Redirect to login page
+        window.location.href = '/login';
+      }
+    }
+
     // Enhanced error logging for debugging
     console.error('API Error Details:', {
       message: error.message,
@@ -261,6 +284,505 @@ export const fileAPI = {
 export const versionAPI = {
   getVersion: () => {
     return api.get('/api/version')
+  },
+}
+
+// Company/Supplier API functions
+export const companyAPI = {
+  // Get all companies
+  getCompanies: (params = {}) => {
+    return api.get('/api/companies', { params })
+  },
+
+  // Get single company
+  getCompany: (id) => {
+    return api.get(`/api/companies/${id}`)
+  },
+
+  // Create company
+  createCompany: (data) => {
+    return api.post('/api/companies', data)
+  },
+
+  // Update company
+  updateCompany: (id, data) => {
+    return api.patch(`/api/companies/${id}`, data)
+  },
+
+  // Delete company
+  deleteCompany: (id) => {
+    return api.delete(`/api/companies/${id}`)
+  },
+
+  // Search companies (autocomplete)
+  searchCompanies: (query, companyType) => {
+    return api.get('/api/companies/search/autocomplete', {
+      params: { q: query, companyType }
+    })
+  },
+
+  // Get products for a supplier
+  getCompanyProducts: (companyId) => {
+    return api.get(`/api/companies/${companyId}/products`)
+  },
+}
+
+// Product API functions
+export const productAPI = {
+  // Get all products
+  getProducts: (params = {}) => {
+    return api.get('/api/products', { params })
+  },
+
+  // Get single product
+  getProduct: (id) => {
+    return api.get(`/api/products/${id}`)
+  },
+
+  // Create product
+  createProduct: (data) => {
+    return api.post('/api/products', data)
+  },
+
+  // Update product
+  updateProduct: (id, data) => {
+    return api.patch(`/api/products/${id}`, data)
+  },
+
+  // Search products (autocomplete) - enhanced with filters
+  searchProducts: (query, supplierId, additionalParams = {}) => {
+    return api.get('/api/products/search/autocomplete', {
+      params: { 
+        q: query || '', // Send empty string instead of undefined
+        supplierId: supplierId || undefined,
+        ...additionalParams
+      }
+    })
+  },
+
+  // Import CSV
+  importCSV: (csvData, columnMapping) => {
+    return api.post('/api/products/import-csv', { csvData, columnMapping })
+  },
+
+  // Get suppliers for a product
+  getProductSuppliers: (productId) => {
+    return api.get(`/api/products/${productId}/suppliers`)
+  },
+
+  // Variant management
+  createVariant: (productId, data) => {
+    return api.post(`/api/products/${productId}/variants`, data)
+  },
+  updateVariant: (productId, variantId, data) => {
+    return api.patch(`/api/products/${productId}/variants/${variantId}`, data)
+  },
+  deleteVariant: (productId, variantId) => {
+    return api.delete(`/api/products/${productId}/variants/${variantId}`)
+  },
+}
+
+// Product Type API functions
+export const productTypeAPI = {
+  // Get all product types
+  getProductTypes: (params = {}) => {
+    return api.get('/api/product-types', { params })
+  },
+
+  // Get single product type
+  getProductType: (id) => {
+    return api.get(`/api/product-types/${id}`)
+  },
+
+  // Create product type
+  createProductType: (data) => {
+    return api.post('/api/product-types', data)
+  },
+
+  // Update product type
+  updateProductType: (id, data) => {
+    return api.patch(`/api/product-types/${id}`, data)
+  },
+
+  // Delete product type
+  deleteProductType: (id) => {
+    return api.delete(`/api/product-types/${id}`)
+  },
+
+  // Get products by type
+  getProductsByType: (typeId) => {
+    return api.get(`/api/product-types/${typeId}/products`)
+  },
+}
+
+// Material Request API functions
+export const materialRequestAPI = {
+  // Get all material requests
+  getMaterialRequests: (params = {}) => {
+    return api.get('/api/material-requests', { params })
+  },
+
+  // Get single material request
+  getMaterialRequest: (id) => {
+    return api.get(`/api/material-requests/${id}`)
+  },
+
+  // Create material request
+  createMaterialRequest: (data) => {
+    return api.post('/api/material-requests', data)
+  },
+
+  // Update material request
+  updateMaterialRequest: (id, data) => {
+    return api.patch(`/api/material-requests/${id}`, data)
+  },
+
+  // Approve material request
+  approveRequest: (id, approvalNotes) => {
+    return api.post(`/api/material-requests/${id}/approve`, { approvalNotes })
+  },
+
+  // Reject material request
+  rejectRequest: (id, rejectionReason) => {
+    return api.post(`/api/material-requests/${id}/reject`, { rejectionReason })
+  },
+
+  // Convert material request to PO
+  convertToPO: (id, supplierId, defaultCostCode) => {
+    return api.post(`/api/material-requests/${id}/convert-to-po`, {
+      supplierId,
+      defaultCostCode
+    })
+  },
+}
+
+// Purchase Order API functions
+export const purchaseOrderAPI = {
+  // Get all purchase orders
+  getPurchaseOrders: (params = {}) => {
+    return api.get('/api/purchase-orders', { params })
+  },
+
+  // Get single purchase order
+  getPurchaseOrder: (id) => {
+    return api.get(`/api/purchase-orders/${id}`)
+  },
+
+  // Create purchase order
+  createPurchaseOrder: (data) => {
+    return api.post('/api/purchase-orders', data)
+  },
+
+  // Update purchase order
+  updatePurchaseOrder: (id, data) => {
+    return api.patch(`/api/purchase-orders/${id}`, data)
+  },
+
+  // Submit for approval
+  submitForApproval: (id) => {
+    return api.post(`/api/purchase-orders/${id}/submit-for-approval`)
+  },
+
+  // Approve PO
+  approvePO: (id) => {
+    return api.post(`/api/purchase-orders/${id}/approve`)
+  },
+
+  // Reject PO
+  rejectPO: (id, rejectionReason) => {
+    return api.post(`/api/purchase-orders/${id}/reject`, { rejectionReason })
+  },
+
+  // Issue PO
+  issuePO: (id) => {
+    return api.post(`/api/purchase-orders/${id}/issue`)
+  },
+
+  // Cancel PO
+  cancelPO: (id) => {
+    return api.post(`/api/purchase-orders/${id}/cancel`)
+  },
+
+  // Download PO PDF
+  downloadPOPDF: (id) => {
+    return api.get(`/api/purchase-orders/${id}/pdf`, {
+      responseType: 'blob'
+    })
+  },
+
+  // Send PO via Email
+  sendPOEmail: (id, toEmail) => {
+    return api.post(`/api/purchase-orders/${id}/send-email`, {
+      toEmail
+    })
+  },
+}
+
+// PO Receipt API functions
+export const poReceiptAPI = {
+  // Get all receipts
+  getReceipts: (params = {}) => {
+    return api.get('/api/po-receipts', { params })
+  },
+
+  // Get single receipt
+  getReceipt: (id) => {
+    return api.get(`/api/po-receipts/${id}`)
+  },
+
+  // Get open POs for job
+  getOpenPOsForJob: (jobId) => {
+    return api.get(`/api/po-receipts/job/${jobId}/open-pos`)
+  },
+
+  // Create receipt
+  createReceipt: (data) => {
+    return api.post('/api/po-receipts', data)
+  },
+
+  // Sync offline receipts
+  syncOfflineReceipts: (receipts) => {
+    return api.post('/api/po-receipts/sync-offline', { receipts })
+  },
+
+  // Approve over-receipt
+  approveOverReceipt: (id) => {
+    return api.post(`/api/po-receipts/${id}/approve-over-receipt`)
+  },
+}
+
+// Google OAuth API functions
+export const googleAuthAPI = {
+  // Get OAuth connection URL
+  // redirectUri is optional - backend handles it automatically
+  getAuthUrl: (redirectUri) => {
+    const params = redirectUri ? { redirectUri } : {};
+    return api.get('/api/auth/google/connect', { params })
+  },
+
+  // Get connection status
+  getConnectionStatus: () => {
+    return api.get('/api/auth/google/status')
+  },
+
+  // Disconnect Google account
+  disconnect: () => {
+    return api.post('/api/auth/google/disconnect')
+  },
+}
+
+// Upload API functions
+export const uploadAPI = {
+  // Upload single photo
+  uploadPhoto: (file) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return api.post('/api/uploads/photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // Upload multiple photos
+  uploadPhotos: (files) => {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('photos', file);
+    });
+    return api.post('/api/uploads/photos', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+}
+
+// Specification API functions
+export const specificationAPI = {
+  // Get all specifications for a job
+  getSpecifications: (jobId, params = {}) => {
+    return api.get(`/api/jobs/${jobId}/specifications`, { params })
+  },
+
+  // Get single specification
+  getSpecification: (id) => {
+    return api.get(`/api/specifications/${id}`)
+  },
+
+  // Create specification
+  createSpecification: (jobId, data) => {
+    return api.post(`/api/jobs/${jobId}/specifications`, data)
+  },
+
+  // Update specification
+  updateSpecification: (id, data) => {
+    return api.patch(`/api/specifications/${id}`, data)
+  },
+
+  // Delete specification
+  deleteSpecification: (id) => {
+    return api.delete(`/api/specifications/${id}`)
+  },
+
+  // Match specifications for context
+  matchSpecifications: (context) => {
+    return api.post('/api/specifications/match', context)
+  },
+
+  // Apply template to job
+  applyTemplate: (jobId, templateId, systems, areas) => {
+    return api.post(`/api/jobs/${jobId}/specifications/apply-template`, {
+      templateId,
+      systems,
+      areas
+    })
+  }
+}
+
+// Specification Template API functions
+export const specificationTemplateAPI = {
+  // Get all templates
+  getTemplates: (params = {}) => {
+    return api.get('/api/specification-templates', { params })
+  },
+
+  // Get single template
+  getTemplate: (id) => {
+    return api.get(`/api/specification-templates/${id}`)
+  },
+
+  // Create template
+  createTemplate: (data) => {
+    return api.post('/api/specification-templates', data)
+  },
+
+  // Update template
+  updateTemplate: (id, data) => {
+    return api.patch(`/api/specification-templates/${id}`, data)
+  },
+
+  // Delete template
+  deleteTemplate: (id) => {
+    return api.delete(`/api/specification-templates/${id}`)
+  }
+}
+
+// Property Definition API functions
+export const propertyDefinitionAPI = {
+  // Get all property definitions
+  getPropertyDefinitions: (params = {}) => {
+    return api.get('/api/property-definitions', { params })
+  },
+
+  // Get property definitions grouped by category
+  getPropertyDefinitionsByCategory: () => {
+    return api.get('/api/property-definitions/by-category')
+  },
+
+  // Get single property definition
+  getPropertyDefinition: (id) => {
+    return api.get(`/api/property-definitions/${id}`)
+  },
+
+  // Create property definition
+  createPropertyDefinition: (data) => {
+    return api.post('/api/property-definitions', data)
+  },
+
+  // Update property definition
+  updatePropertyDefinition: (id, data) => {
+    return api.patch(`/api/property-definitions/${id}`, data)
+  },
+
+  // Delete property definition
+  deletePropertyDefinition: (id) => {
+    return api.delete(`/api/property-definitions/${id}`)
+  },
+
+  // Get property definition categories
+  getPropertyDefinitionCategories: () => {
+    return api.get('/api/property-definitions/categories')
+  }
+}
+
+// Unit of Measure API functions
+export const unitOfMeasureAPI = {
+  // Get all units of measure
+  getUnitsOfMeasure: (params = {}) => {
+    return api.get('/api/units-of-measure', { params })
+  },
+
+  // Get single unit of measure
+  getUnitOfMeasure: (id) => {
+    return api.get(`/api/units-of-measure/${id}`)
+  },
+
+  // Create unit of measure
+  createUnitOfMeasure: (data) => {
+    return api.post('/api/units-of-measure', data)
+  },
+
+  // Update unit of measure
+  updateUnitOfMeasure: (id, data) => {
+    return api.patch(`/api/units-of-measure/${id}`, data)
+  },
+
+  // Delete unit of measure
+  deleteUnitOfMeasure: (id) => {
+    return api.delete(`/api/units-of-measure/${id}`)
+  },
+
+  // Get unit categories
+  getUnitCategories: () => {
+    return api.get('/api/units-of-measure/categories')
+  }
+}
+
+export const inventoryAPI = {
+  // Get all inventory
+  getInventory: (params = {}) => {
+    return api.get('/api/inventory', { params })
+  },
+
+  // Get single inventory record
+  getInventoryRecord: (id) => {
+    return api.get(`/api/inventory/${id}`)
+  },
+
+  // Get transactions
+  getTransactions: (params = {}) => {
+    return api.get('/api/inventory/transactions', { params })
+  },
+
+  // Issue to job
+  issueToJob: (inventoryId, quantity, jobId, costCode) => {
+    return api.post('/api/inventory/issue-to-job', {
+      inventoryId,
+      quantity,
+      jobId,
+      costCode
+    })
+  },
+
+  // Return from job
+  returnFromJob: (productId, location, quantity, jobId, condition) => {
+    return api.post('/api/inventory/return-from-job', {
+      productId,
+      location,
+      quantity,
+      jobId,
+      condition
+    })
+  },
+
+  // Adjust inventory
+  adjustInventory: (inventoryId, quantity, reason) => {
+    return api.post('/api/inventory/adjust', {
+      inventoryId,
+      quantity,
+      reason
+    })
   },
 }
 

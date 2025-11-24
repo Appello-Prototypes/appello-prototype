@@ -1,0 +1,559 @@
+{
+  "completed": [
+    {
+      "name": "FIBREGLASS PIPE WITH ASJ",
+      "completedAt": "2025-11-23T20:26:49.785Z",
+      "result": {
+        "note": "Imported via ingest-micro-lok-pricing.js"
+      }
+    },
+    {
+      "name": "FIBERGLASS FITTING 45 DEGREE",
+      "completedAt": "2025-11-23T23:13:40.417Z",
+      "result": {
+        "productId": "6923952435368e9d8a5dd03b",
+        "productName": "FIBERGLASS FITTING 45 DEGREE",
+        "variantsCreated": 153,
+        "format": "fitting-matrix"
+      }
+    },
+    {
+      "name": "FIBERGLASS FITTING 90 DEGREE",
+      "completedAt": "2025-11-23T23:14:00.586Z",
+      "result": {
+        "productId": "6923953835368e9d8a5dd03f",
+        "productName": "FIBERGLASS FITTING 90 DEGREE",
+        "variantsCreated": 153,
+        "format": "fitting-matrix"
+      }
+    },
+    {
+      "name": "FIBERGLASS FITTING TEES",
+      "completedAt": "2025-11-23T23:18:12.646Z",
+      "result": {
+        "productId": "6923963435368e9d8a5dd06e",
+        "productName": "FIBERGLASS FITTING TEES",
+        "variantsCreated": 153,
+        "format": "fitting-matrix"
+      }
+    },
+    {
+      "name": "FIBREGLASS RC DUCTLINER",
+      "completedAt": "2025-11-23T23:18:54.518Z",
+      "result": {
+        "productsCreated": 2,
+        "results": [
+          {
+            "productId": "6923965e35368e9d8a5dd075",
+            "productName": "JM LINACOUSTIC RC",
+            "variantsCreated": 8
+          },
+          {
+            "productId": "6923965e35368e9d8a5dd076",
+            "productName": "JM DUCT LINER PM",
+            "variantsCreated": 8
+          }
+        ],
+        "format": "duct-liner"
+      }
+    },
+    {
+      "name": "FIBREGLASS OTHER HVAC INSULATION",
+      "completedAt": "2025-11-23T23:19:18.485Z",
+      "result": {
+        "productsCreated": 3,
+        "results": [
+          {
+            "productId": "6923967635368e9d8a5dd07a",
+            "productName": "JM R300 DUCT BOARD",
+            "variantsCreated": 8
+          },
+          {
+            "productId": "6923967635368e9d8a5dd07b",
+            "productName": "CERTAINTEED RIGID LINER BOARD WITH TOUGHGARD FACING",
+            "variantsCreated": 8
+          },
+          {
+            "productId": "6923967635368e9d8a5dd07c",
+            "productName": "JM SPIRACOUSTIC PLUS",
+            "variantsCreated": 8
+          }
+        ],
+        "format": "duct-liner"
+      }
+    },
+    {
+      "name": "FACED BOARD",
+      "completedAt": "2025-11-23T23:22:34.739Z",
+      "result": {
+        "productsCreated": 5,
+        "results": [
+          {
+            "productId": "6923973a35368e9d8a5dd09f",
+            "productName": "FSK FACED BOARD 2.25 LB./CU.FT. JM 813",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923973a35368e9d8a5dd0a0",
+            "productName": "FSK FACED BOARD 3.0 LB. /CU.FT. CERTAINTEED CB300                        JM 814",
+            "variantsCreated": 4
+          },
+          {
+            "productId": "6923973a35368e9d8a5dd0a1",
+            "productName": "FSK FACED BOARD 4.25 LB./CU.FT. JM 815",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "6923973a35368e9d8a5dd0a3",
+            "productName": "FSK FACED BOARD 6.0 LB./CU.FT. JM 817",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923973a35368e9d8a5dd0a3",
+            "productName": "FSK FACED BOARD 6.0 LB./CU.FT. JM 817",
+            "variantsCreated": 3
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "PLAIN BOARD",
+      "completedAt": "2025-11-23T23:22:58.349Z",
+      "result": {
+        "productsCreated": 6,
+        "results": [
+          {
+            "productId": "6923975135368e9d8a5dd0a7",
+            "productName": "1.1 LB./CU.FT. (Also available 32\" X 48\") Type CB 110",
+            "variantsCreated": 5
+          },
+          {
+            "productId": "6923975135368e9d8a5dd0a8",
+            "productName": "2.25 LB./CU.FT. JM 813",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923975135368e9d8a5dd0a9",
+            "productName": "3.0 LB./CU.FT. Type CB 300                                               JM814",
+            "variantsCreated": 7
+          },
+          {
+            "productId": "6923975135368e9d8a5dd0aa",
+            "productName": "4.25 LB./CU.FT. JM 815",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "6923975235368e9d8a5dd0ab",
+            "productName": "6.0 LB./CU.FT.                                           JM 817",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923975235368e9d8a5dd0ab",
+            "productName": "6.0 LB./CU.FT.                                           JM 817",
+            "variantsCreated": 3
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "PIPE & TANK WRAP",
+      "completedAt": "2025-11-23T23:23:43.047Z",
+      "result": {
+        "productsCreated": 2,
+        "results": [
+          {
+            "productId": "6923977e35368e9d8a5dd0b5",
+            "productName": "JM MICROFLEX & CERTAINTEED CRIMPWRAP PIPE & TANK with FSK",
+            "variantsCreated": 6
+          },
+          {
+            "productId": "6923977e35368e9d8a5dd0b7",
+            "productName": "CCI FIBREGLASS PIPE & TANK with FSK",
+            "variantsCreated": 6
+          }
+        ],
+        "format": "duct-liner"
+      }
+    },
+    {
+      "name": "DUCT WRAP",
+      "completedAt": "2025-11-23T23:28:28.501Z",
+      "result": {
+        "productsCreated": 5,
+        "results": [
+          {
+            "productId": "6923986835368e9d8a5dd0df",
+            "productName": "3/4 lb. FSK FLEXIBLE DUCT WRAP",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923986835368e9d8a5dd0e0",
+            "productName": "1 lb. FSK FLEXIBLE DUCT WRAP",
+            "variantsCreated": 5
+          },
+          {
+            "productId": "6923986835368e9d8a5dd0e1",
+            "productName": "1.5 lb. FSK FLEXIBLE DUCT WRAP",
+            "variantsCreated": 2
+          },
+          {
+            "productId": "6923986935368e9d8a5dd0e2",
+            "productName": "PLAIN DUCTWRAP",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "6923986935368e9d8a5dd0e3",
+            "productName": "FITTING WRAP - PLAIN FOIL",
+            "variantsCreated": 2
+          }
+        ],
+        "format": "duct-liner"
+      }
+    },
+    {
+      "name": "OEM PRODUCTS",
+      "completedAt": "2025-11-23T23:30:55.245Z",
+      "result": {
+        "productsCreated": 7,
+        "results": [
+          {
+            "productId": "6923992e35368e9d8a5dd101",
+            "productName": "WHISPERTONE WALLBOARD WITH MAT",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923992e35368e9d8a5dd102",
+            "productName": "WHISPERTONE WALLBOARD                                  (5.0 LB) WITH MAT ON BOTH SIDES",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "6923992e35368e9d8a5dd103",
+            "productName": "WHISPERTONE TACKBOARD                                (2.5 LB)",
+            "variantsCreated": 2
+          },
+          {
+            "productId": "6923992e35368e9d8a5dd104",
+            "productName": "WHISPERTONE TACKBOARD                            (5.5 LB)",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "6923992e35368e9d8a5dd105",
+            "productName": "MICROLITE                                        PLAIN",
+            "variantsCreated": 4
+          },
+          {
+            "productId": "6923992e35368e9d8a5dd106",
+            "productName": "TUFSKIN",
+            "variantsCreated": 3
+          },
+          {
+            "productId": "6923992e35368e9d8a5dd106",
+            "productName": "TUFSKIN",
+            "variantsCreated": 3
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "MINERAL WOOL PIPE INSULATION",
+      "completedAt": "2025-11-23T23:33:34.594Z",
+      "result": {
+        "productId": "692399ce35368e9d8a5dd124",
+        "productName": "MINERAL WOOL PIPE INSULATION",
+        "variantsCreated": 179,
+        "format": "mineral-wool-pipe"
+      }
+    },
+    {
+      "name": "JM MINERAL WOOL PIPE",
+      "completedAt": "2025-11-23T23:34:17.655Z",
+      "result": {
+        "productId": "692399f935368e9d8a5dd12d",
+        "productName": "JM MINERAL WOOL PIPE",
+        "variantsCreated": 148,
+        "format": "mineral-wool-pipe"
+      }
+    },
+    {
+      "name": "MINERAL WOOL FITTING 45 DEGREE",
+      "completedAt": "2025-11-23T23:38:39.546Z",
+      "result": {
+        "productId": "69239aff35368e9d8a5dd15e",
+        "productName": "MINERAL WOOL FITTING 45 DEGREE",
+        "variantsCreated": 153,
+        "format": "fitting-matrix"
+      }
+    },
+    {
+      "name": "MINERAL WOOL FITTING 90 DEGREE",
+      "completedAt": "2025-11-23T23:38:54.930Z",
+      "result": {
+        "productId": "69239b0e35368e9d8a5dd162",
+        "productName": "MINERAL WOOL FITTING 90 DEGREE",
+        "variantsCreated": 153,
+        "format": "fitting-matrix"
+      }
+    },
+    {
+      "name": "MINERAL WOOL FITTING TEE",
+      "completedAt": "2025-11-23T23:39:29.254Z",
+      "result": {
+        "productId": "69239b3135368e9d8a5dd169",
+        "productName": "MINERAL WOOL FITTING TEE",
+        "variantsCreated": 153,
+        "format": "fitting-matrix"
+      }
+    },
+    {
+      "name": "ROCKWOOL PIPE WITH ASJ",
+      "completedAt": "2025-11-23T23:40:25.213Z",
+      "result": {
+        "productId": "69239b6935368e9d8a5dd179",
+        "productName": "ROCKWOOL PIPE WITH ASJ",
+        "variantsCreated": 259,
+        "format": "mineral-wool-pipe"
+      }
+    },
+    {
+      "name": "MINERAL WOOL PIPE & TANK WRAP",
+      "completedAt": "2025-11-23T23:41:20.157Z",
+      "result": {
+        "productsCreated": 2,
+        "results": [
+          {
+            "productId": "69239b9f35368e9d8a5dd186",
+            "productName": "ENERWRAP®  MA 960",
+            "variantsCreated": 5
+          },
+          {
+            "productId": "69239ba035368e9d8a5dd187",
+            "productName": "JOHNS MANVILLE MINWOOL-1200 PIPE & TANK WRAP",
+            "variantsCreated": 6
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "CCI MW PIPE & TANK",
+      "completedAt": "2025-11-23T23:41:39.722Z",
+      "result": {
+        "productsCreated": 1,
+        "results": [
+          {
+            "productId": "69239bb335368e9d8a5dd18d",
+            "productName": "CCI MINERAL WOOL PIPE AND TANK 4 LB DENSITY",
+            "variantsCreated": 7
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "INDUSTRIAL BOARD 2 TO 8LB DENSITY",
+      "completedAt": "2025-11-23T23:42:13.470Z",
+      "result": {
+        "productsCreated": 9,
+        "results": [
+          {
+            "productId": "69239bd435368e9d8a5dd193",
+            "productName": "Industrial Board   NOMINAL DENSITY 4LB ACTUAL DENSITY 3LB",
+            "variantsCreated": 4
+          },
+          {
+            "productId": "69239bd435368e9d8a5dd194",
+            "productName": "ROCKWOOL PROROX SL 930",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239bd435368e9d8a5dd195",
+            "productName": "JM 1240",
+            "variantsCreated": 2
+          },
+          {
+            "productId": "69239bd435368e9d8a5dd196",
+            "productName": "Industrial Board   NOMINAL DENSITY 6LB ACTUAL DENSITY 4LB",
+            "variantsCreated": 4
+          },
+          {
+            "productId": "69239bd435368e9d8a5dd197",
+            "productName": "ROCKWOOL PROROX SL 940",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239bd435368e9d8a5dd198",
+            "productName": "JM 1260",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239bd435368e9d8a5dd199",
+            "productName": "Industrial Board   NOMINAL DENSITY 8LB ACTUAL DENSITY 6LB",
+            "variantsCreated": 4
+          },
+          {
+            "productId": "69239bd535368e9d8a5dd19a",
+            "productName": "ROCKWOOL PROROX SL 960",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239bd535368e9d8a5dd19b",
+            "productName": "JM 1280",
+            "variantsCreated": 2
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "INDUSTRIAL BOARD 10 TO 12LB DENSITY",
+      "completedAt": "2025-11-23T23:42:29.186Z",
+      "result": {
+        "productsCreated": 2,
+        "results": [
+          {
+            "productId": "69239be535368e9d8a5dd19e",
+            "productName": "Industrial Board   NOMINAL DENSITY 10LB ACTUAL DENSITY 7.6LB",
+            "variantsCreated": 4
+          },
+          {
+            "productId": "69239be535368e9d8a5dd19f",
+            "productName": "Industrial Board   NOMINAL DENSITY 12LB ACTUAL DENSITY 8.6LB",
+            "variantsCreated": 3
+          }
+        ],
+        "format": "board"
+      }
+    },
+    {
+      "name": "INDUSTRIAL FLEXIBLE BATTS",
+      "completedAt": "2025-11-23T23:43:04.549Z",
+      "result": {
+        "productsCreated": 9,
+        "results": [
+          {
+            "productId": "69239c0735368e9d8a5dd1a7",
+            "productName": "INDUSTRIAL",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1a8",
+            "productName": "FLEX BATTS",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1a9",
+            "productName": "JM Flex Batt 1240",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1a7",
+            "productName": "INDUSTRIAL",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1a8",
+            "productName": "FLEX BATTS",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1aa",
+            "productName": "Rockwool ProRox FSL 940",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1a7",
+            "productName": "INDUSTRIAL",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0735368e9d8a5dd1a8",
+            "productName": "FLEX BATTS",
+            "variantsCreated": 1
+          },
+          {
+            "productId": "69239c0835368e9d8a5dd1ab",
+            "productName": "Rockwool ProRox FSL 960",
+            "variantsCreated": 1
+          }
+        ],
+        "format": "board"
+      }
+    }
+  ],
+  "failed": [
+    {
+      "name": "FIBERGLASS FITTING 45 DEGREE",
+      "failedAt": "2025-11-23T23:12:43.132Z",
+      "error": "Unsupported format: unknown. Please implement handler for this format."
+    },
+    {
+      "name": "FIBREGLASS RC DUCTLINER",
+      "failedAt": "2025-11-23T23:18:46.362Z",
+      "error": "Unsupported format: unknown. Please implement handler for this format."
+    },
+    {
+      "name": "FACED BOARD",
+      "failedAt": "2025-11-23T23:22:00.585Z",
+      "error": "Unsupported format: matrix. Please implement handler for this format."
+    },
+    {
+      "name": "PLAIN BOARD",
+      "failedAt": "2025-11-23T23:22:49.459Z",
+      "error": "No board products found in sheet"
+    },
+    {
+      "name": "PIPE & TANK WRAP",
+      "failedAt": "2025-11-23T23:23:15.480Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-PIPE___TANK_WRAP.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "DUCT WRAP",
+      "failedAt": "2025-11-23T23:24:56.174Z",
+      "error": "No valid variants found for 3/4 lb. FSK FLEXIBLE DUCT WRAP"
+    },
+    {
+      "name": "OEM PRODUCTS",
+      "failedAt": "2025-11-23T23:30:20.978Z",
+      "error": "No duct liner products found in sheet"
+    },
+    {
+      "name": "MINERAL WOOL PIPE INSULATION",
+      "failedAt": "2025-11-23T23:32:04.250Z",
+      "error": "Unsupported format: matrix. Please implement handler for this format."
+    },
+    {
+      "name": "MINERAL WOOL FITTING 45 DEGREE",
+      "failedAt": "2025-11-23T23:38:34.985Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-MINERAL_WOOL_FITTING_45_DEGREE.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "ROCKWOOL PIPE WITH ASJ",
+      "failedAt": "2025-11-23T23:39:50.877Z",
+      "error": "Unsupported format: unknown. Please implement handler for this format."
+    },
+    {
+      "name": "MINERAL WOOL PIPE & TANK WRAP",
+      "failedAt": "2025-11-23T23:41:04.391Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-MINERAL_WOOL_PIPE___TANK_WRAP.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "CCI MW PIPE & TANK",
+      "failedAt": "2025-11-23T23:41:33.079Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-CCI_MW_PIPE___TANK.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "INDUSTRIAL BOARD 2 TO 8LB DENSITY",
+      "failedAt": "2025-11-23T23:41:57.662Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-INDUSTRIAL_BOARD_2_TO_8LB_DENSITY.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "INDUSTRIAL FLEXIBLE BATTS",
+      "failedAt": "2025-11-23T23:42:45.523Z",
+      "error": "No board products found in sheet"
+    }
+  ],
+  "lastUpdated": "2025-11-23T23:43:04.549Z"
+}

@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import App from './App.jsx'
 import './index.css'
+import './styles/grid-layout.css'
 
 // Create a query client with optimized caching
 const queryClient = new QueryClient({

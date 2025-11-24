@@ -28,13 +28,44 @@ import MonthlyCostReport from './pages/MonthlyCostReport'
 import CostToComplete from './pages/CostToComplete'
 import JobFinancialSummary from './pages/JobFinancialSummary'
 import OperationsTasks from './pages/OperationsTasks'
+import CompanyList from './pages/CompanyList'
+import CompanyForm from './pages/CompanyForm'
+import CompanyOverview from './pages/CompanyOverview'
+import CompanyProducts from './pages/CompanyProducts'
+import CompanyLayout from './components/CompanyLayout'
+import ProductList from './pages/ProductList'
+import ProductForm from './pages/ProductForm'
+import ProductDetail from './pages/ProductDetail'
+import DiscountWizard from './pages/DiscountWizard'
+import ProductTypeList from './pages/ProductTypeList'
+import ProductTypeForm from './pages/ProductTypeForm'
+import MaterialRequestList from './pages/MaterialRequestList'
+import MaterialRequestForm from './pages/MaterialRequestForm'
+import MaterialRequestDetail from './pages/MaterialRequestDetail'
+import PurchaseOrderList from './pages/PurchaseOrderList'
+import PurchaseOrderForm from './pages/PurchaseOrderForm'
+import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
+import Receiving from './pages/Receiving'
+import DiscountManagement from './pages/DiscountManagement'
+import PricebookView from './pages/PricebookView'
+import SpecificationList from './pages/SpecificationList'
+import SpecificationForm from './pages/SpecificationForm'
+import PropertyDefinitionList from './pages/PropertyDefinitionList'
+import PropertyDefinitionForm from './pages/PropertyDefinitionForm'
+import Settings from './pages/Settings'
+import Login from './pages/Login'
+import AuthCallback from './pages/AuthCallback'
 
 function App() {
   return (
-    <Layout>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="*" element={
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/projects" element={<ProjectList />} />
         <Route path="/projects/:projectId" element={<ProjectDashboard />} />
         <Route path="/jobs" element={<JobList />} />
@@ -42,6 +73,9 @@ function App() {
           <Route index element={<JobOverview />} />
           <Route path="tasks-enhanced" element={<EnhancedTaskView />} />
           <Route path="sov-setup" element={<SOVSetup />} />
+          <Route path="specifications" element={<SpecificationList />} />
+          <Route path="specifications/create" element={<SpecificationForm />} />
+          <Route path="specifications/:id/edit" element={<SpecificationForm />} />
           <Route path="job-financial-summary" element={<JobFinancialSummary />} />
           <Route path="progress-reports" element={<ProgressReports />} />
           <Route path="earned-vs-burned" element={<EarnedVsBurned />} />
@@ -61,9 +95,39 @@ function App() {
         <Route path="/work-orders/create" element={<CreateWorkOrder />} />
         <Route path="/work-orders/:id" element={<WorkOrderDetail />} />
         <Route path="/time-entry" element={<TimeEntry />} />
+        <Route path="/companies" element={<CompanyList />} />
+        <Route path="/companies/create" element={<CompanyForm />} />
+        <Route path="/companies/:id/edit" element={<CompanyForm />} />
+        <Route path="/companies/:id" element={<CompanyLayout />}>
+          <Route index element={<CompanyOverview />} />
+          <Route path="products" element={<CompanyProducts />} />
+        </Route>
+        <Route path="/products" element={<ProductList />} />
+        <Route path="/products/create" element={<ProductForm />} />
+        <Route path="/products/:id/edit" element={<ProductForm />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/products/:id/discount-wizard" element={<DiscountWizard />} />
+        <Route path="/product-types" element={<ProductTypeList />} />
+        <Route path="/product-types/create" element={<ProductTypeForm />} />
+        <Route path="/product-types/:id/edit" element={<ProductTypeForm />} />
+        <Route path="/property-definitions" element={<PropertyDefinitionList />} />
+        <Route path="/property-definitions/create" element={<PropertyDefinitionForm />} />
+        <Route path="/property-definitions/:id/edit" element={<PropertyDefinitionForm />} />
+        <Route path="/material-requests" element={<MaterialRequestList />} />
+        <Route path="/material-requests/create" element={<MaterialRequestForm />} />
+        <Route path="/material-requests/:id" element={<MaterialRequestDetail />} />
+        <Route path="/purchase-orders" element={<PurchaseOrderList />} />
+        <Route path="/purchase-orders/create" element={<PurchaseOrderForm />} />
+        <Route path="/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+        <Route path="/receiving" element={<Receiving />} />
+        <Route path="/discounts" element={<DiscountManagement />} />
+        <Route path="/pricebook" element={<PricebookView />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Layout>
+          </Routes>
+        </Layout>
+      } />
+    </Routes>
   )
 }
 

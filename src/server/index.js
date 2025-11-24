@@ -20,6 +20,20 @@ const userRoutes = require('./routes/users');
 const sovRoutes = require('./routes/sov');
 const financialRoutes = require('./routes/financial');
 const workOrderRoutes = require('./routes/workOrders');
+// Purchase Order & Material Inventory routes
+const companyRoutes = require('./routes/companies');
+const productRoutes = require('./routes/products');
+const productTypeRoutes = require('./routes/productTypes');
+const materialRequestRoutes = require('./routes/materialRequests');
+const purchaseOrderRoutes = require('./routes/purchaseOrders');
+const poReceiptRoutes = require('./routes/poReceipts');
+const inventoryRoutes = require('./routes/inventory');
+const discountRoutes = require('./routes/discounts');
+const uploadRoutes = require('./routes/uploads');
+const specificationRoutes = require('./routes/specifications');
+const specificationTemplateRoutes = require('./routes/specificationTemplates');
+const propertyDefinitionRoutes = require('./routes/propertyDefinitions');
+const unitOfMeasureRoutes = require('./routes/unitOfMeasures');
 const { handleUploadError } = require('./middleware/upload');
 
 // Create Express app
@@ -157,6 +171,15 @@ const connectDB = async () => {
     heartbeatFrequencyMS: isLocalMongo ? 60000 : (isLocalDev ? 30000 : 10000),
     // Direct connection for local MongoDB (faster)
     directConnection: isLocalMongo ? true : false,
+    // SSL/TLS options for MongoDB Atlas (required for Atlas connections)
+    // Node.js v25+ with OpenSSL 3.x requires explicit TLS configuration
+    ...(isLocalMongo ? {} : {
+      // Explicitly enable TLS for Atlas connections
+      // This helps with Node.js v25+ compatibility
+      tls: true,
+      // Use secure defaults but allow for compatibility
+      tlsInsecure: false,
+    }),
   };
 
   // Store the URI we're connecting to
@@ -302,6 +325,20 @@ app.use('/api/users', ensureDBConnection, userRoutes);
 app.use('/api/sov', ensureDBConnection, sovRoutes);
 app.use('/api/financial', ensureDBConnection, financialRoutes);
 app.use('/api/work-orders', ensureDBConnection, workOrderRoutes);
+// Purchase Order & Material Inventory routes
+app.use('/api/companies', ensureDBConnection, companyRoutes);
+app.use('/api/products', ensureDBConnection, productRoutes);
+app.use('/api/product-types', ensureDBConnection, productTypeRoutes);
+app.use('/api/material-requests', ensureDBConnection, materialRequestRoutes);
+app.use('/api/purchase-orders', ensureDBConnection, purchaseOrderRoutes);
+app.use('/api/po-receipts', ensureDBConnection, poReceiptRoutes);
+app.use('/api/inventory', ensureDBConnection, inventoryRoutes);
+app.use('/api/discounts', ensureDBConnection, discountRoutes);
+app.use('/api/uploads', uploadRoutes); // No DB connection needed for file uploads
+app.use('/api', ensureDBConnection, specificationRoutes);
+app.use('/api/specification-templates', ensureDBConnection, specificationTemplateRoutes);
+app.use('/api/property-definitions', ensureDBConnection, propertyDefinitionRoutes);
+app.use('/api/units-of-measure', ensureDBConnection, unitOfMeasureRoutes);
 
 // Version endpoint
 app.get('/api/version', (req, res) => {
@@ -395,7 +432,7 @@ app.get('/api/health', async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Appello Task Management API is running',
+      message: 'Appello Lab API is running',
       timestamp: new Date().toISOString(),
       version: version,
       environment: isProduction ? 'production' : 'development',
