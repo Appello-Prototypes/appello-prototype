@@ -75,7 +75,9 @@ const googleAuthController = {
 
       // Use the redirect URI that was used in the OAuth request
       // This should match what was sent to Google
-      const backendCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+      // On Vercel, check x-forwarded-proto header for correct protocol
+      const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
+      const backendCallbackUri = `${protocol}://${req.get('host')}/api/auth/google/callback`;
       const tokens = await getTokensFromCode(code, backendCallbackUri);
 
       // Get user info from Google
