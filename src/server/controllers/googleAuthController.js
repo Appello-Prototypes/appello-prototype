@@ -32,10 +32,12 @@ const googleAuthController = {
       });
     } catch (error) {
       console.error('Error initiating Google OAuth:', error);
+      // Always show error message in production for debugging
       res.status(500).json({
         success: false,
         message: 'Failed to initiate Google connection',
-        error: process.env.NODE_ENV === 'development' || process.env.VERCEL ? error.message : 'Internal server error'
+        error: error.message || 'Internal server error',
+        requiresConfiguration: error.message?.includes('not configured') || false
       });
     }
   },
@@ -161,7 +163,8 @@ const googleAuthController = {
 
       res.json({
         success: true,
-        connected: isConnected,
+        isConfigured: true,
+        isConnected,
         email,
         connectedAt
       });
@@ -179,6 +182,15 @@ const googleAuthController = {
   // Disconnect Google account
   disconnect: async (req, res) => {
     try {
+      // Check if Google OAuth is configured
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(503).json({
+          success: false,
+          message: 'Google OAuth is not configured',
+          error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are required'
+        });
+      }
+
       const user = await User.findById(req.user.id);
 
       if (user.googleOAuth && user.googleOAuth.refreshToken) {
@@ -204,7 +216,7 @@ const googleAuthController = {
       res.status(500).json({
         success: false,
         message: 'Failed to disconnect Google account',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        error: error.message || 'Internal server error'
       });
     }
   }
