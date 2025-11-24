@@ -11,30 +11,84 @@ const socketIo = require('socket.io');
 const path = require('path');
 
 // Import routes - if any fail, log but continue (routes will fail gracefully)
-const taskRoutes = require('./routes/tasks');
-const authRoutes = require('./routes/auth');
-const projectRoutes = require('./routes/projects');
-const jobRoutes = require('./routes/jobs');
-const timeEntryRoutes = require('./routes/timeEntries');
-const userRoutes = require('./routes/users');
-const sovRoutes = require('./routes/sov');
-const financialRoutes = require('./routes/financial');
-const workOrderRoutes = require('./routes/workOrders');
+let taskRoutes, authRoutes, projectRoutes, jobRoutes, timeEntryRoutes, userRoutes;
+let sovRoutes, financialRoutes, workOrderRoutes;
+let companyRoutes, productRoutes, productTypeRoutes, materialRequestRoutes;
+let purchaseOrderRoutes, poReceiptRoutes, inventoryRoutes, discountRoutes;
+let uploadRoutes, specificationRoutes, specificationTemplateRoutes;
+let propertyDefinitionRoutes, unitOfMeasureRoutes;
+let handleUploadError;
+
+try {
+  taskRoutes = require('./routes/tasks');
+} catch (e) { console.error('Failed to load taskRoutes:', e.message); }
+try {
+  authRoutes = require('./routes/auth');
+} catch (e) { console.error('Failed to load authRoutes:', e.message); }
+try {
+  projectRoutes = require('./routes/projects');
+} catch (e) { console.error('Failed to load projectRoutes:', e.message); }
+try {
+  jobRoutes = require('./routes/jobs');
+} catch (e) { console.error('Failed to load jobRoutes:', e.message); }
+try {
+  timeEntryRoutes = require('./routes/timeEntries');
+} catch (e) { console.error('Failed to load timeEntryRoutes:', e.message); }
+try {
+  userRoutes = require('./routes/users');
+} catch (e) { console.error('Failed to load userRoutes:', e.message); }
+try {
+  sovRoutes = require('./routes/sov');
+} catch (e) { console.error('Failed to load sovRoutes:', e.message); }
+try {
+  financialRoutes = require('./routes/financial');
+} catch (e) { console.error('Failed to load financialRoutes:', e.message); }
+try {
+  workOrderRoutes = require('./routes/workOrders');
+} catch (e) { console.error('Failed to load workOrderRoutes:', e.message); }
 // Purchase Order & Material Inventory routes
-const companyRoutes = require('./routes/companies');
-const productRoutes = require('./routes/products');
-const productTypeRoutes = require('./routes/productTypes');
-const materialRequestRoutes = require('./routes/materialRequests');
-const purchaseOrderRoutes = require('./routes/purchaseOrders');
-const poReceiptRoutes = require('./routes/poReceipts');
-const inventoryRoutes = require('./routes/inventory');
-const discountRoutes = require('./routes/discounts');
-const uploadRoutes = require('./routes/uploads');
-const specificationRoutes = require('./routes/specifications');
-const specificationTemplateRoutes = require('./routes/specificationTemplates');
-const propertyDefinitionRoutes = require('./routes/propertyDefinitions');
-const unitOfMeasureRoutes = require('./routes/unitOfMeasures');
-const { handleUploadError } = require('./middleware/upload');
+try {
+  companyRoutes = require('./routes/companies');
+} catch (e) { console.error('Failed to load companyRoutes:', e.message); }
+try {
+  productRoutes = require('./routes/products');
+} catch (e) { console.error('Failed to load productRoutes:', e.message); }
+try {
+  productTypeRoutes = require('./routes/productTypes');
+} catch (e) { console.error('Failed to load productTypeRoutes:', e.message); }
+try {
+  materialRequestRoutes = require('./routes/materialRequests');
+} catch (e) { console.error('Failed to load materialRequestRoutes:', e.message); }
+try {
+  purchaseOrderRoutes = require('./routes/purchaseOrders');
+} catch (e) { console.error('Failed to load purchaseOrderRoutes:', e.message); }
+try {
+  poReceiptRoutes = require('./routes/poReceipts');
+} catch (e) { console.error('Failed to load poReceiptRoutes:', e.message); }
+try {
+  inventoryRoutes = require('./routes/inventory');
+} catch (e) { console.error('Failed to load inventoryRoutes:', e.message); }
+try {
+  discountRoutes = require('./routes/discounts');
+} catch (e) { console.error('Failed to load discountRoutes:', e.message); }
+try {
+  uploadRoutes = require('./routes/uploads');
+} catch (e) { console.error('Failed to load uploadRoutes:', e.message); }
+try {
+  specificationRoutes = require('./routes/specifications');
+} catch (e) { console.error('Failed to load specificationRoutes:', e.message); }
+try {
+  specificationTemplateRoutes = require('./routes/specificationTemplates');
+} catch (e) { console.error('Failed to load specificationTemplateRoutes:', e.message); }
+try {
+  propertyDefinitionRoutes = require('./routes/propertyDefinitions');
+} catch (e) { console.error('Failed to load propertyDefinitionRoutes:', e.message); }
+try {
+  unitOfMeasureRoutes = require('./routes/unitOfMeasures');
+} catch (e) { console.error('Failed to load unitOfMeasureRoutes:', e.message); }
+try {
+  handleUploadError = require('./middleware/upload').handleUploadError;
+} catch (e) { console.error('Failed to load handleUploadError:', e.message); }
 
 // Create Express app
 const app = express();
@@ -275,6 +329,14 @@ const ensureDBConnection = async (req, res, next) => {
     let mongoUri;
     if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
       mongoUri = process.env.MONGODB_URI;
+      if (!mongoUri) {
+        console.error('❌ MONGODB_URI not set in production');
+        return res.status(500).json({
+          success: false,
+          message: 'Database configuration error',
+          error: 'MONGODB_URI environment variable is not set'
+        });
+      }
     } else {
       // Local development: check for local MongoDB first
       if (process.env.MONGODB_LOCAL_URI) {
@@ -305,40 +367,42 @@ const ensureDBConnection = async (req, res, next) => {
     }
     next();
   } catch (error) {
-    console.error('Database connection failed in middleware:', error.message);
+    console.error('❌ Database connection failed in middleware:', error.message);
+    console.error('Stack:', error.stack);
     res.status(503).json({
       success: false,
       message: 'Database connection unavailable',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Service temporarily unavailable'
+      error: process.env.NODE_ENV === 'development' || process.env.VERCEL ? error.message : 'Service temporarily unavailable'
     });
   }
 };
 
 // API Routes - apply DB connection middleware before routes that need it
 // Note: /api/version and /api/fast-stats don't need DB connection
-app.use('/api/auth', ensureDBConnection, authRoutes);
-app.use('/api/tasks', ensureDBConnection, taskRoutes);
-app.use('/api/projects', ensureDBConnection, projectRoutes);
-app.use('/api/jobs', ensureDBConnection, jobRoutes);
-app.use('/api/time-entries', ensureDBConnection, timeEntryRoutes);
-app.use('/api/users', ensureDBConnection, userRoutes);
-app.use('/api/sov', ensureDBConnection, sovRoutes);
-app.use('/api/financial', ensureDBConnection, financialRoutes);
-app.use('/api/work-orders', ensureDBConnection, workOrderRoutes);
+// Only register routes if they loaded successfully
+if (authRoutes) app.use('/api/auth', ensureDBConnection, authRoutes);
+if (taskRoutes) app.use('/api/tasks', ensureDBConnection, taskRoutes);
+if (projectRoutes) app.use('/api/projects', ensureDBConnection, projectRoutes);
+if (jobRoutes) app.use('/api/jobs', ensureDBConnection, jobRoutes);
+if (timeEntryRoutes) app.use('/api/time-entries', ensureDBConnection, timeEntryRoutes);
+if (userRoutes) app.use('/api/users', ensureDBConnection, userRoutes);
+if (sovRoutes) app.use('/api/sov', ensureDBConnection, sovRoutes);
+if (financialRoutes) app.use('/api/financial', ensureDBConnection, financialRoutes);
+if (workOrderRoutes) app.use('/api/work-orders', ensureDBConnection, workOrderRoutes);
 // Purchase Order & Material Inventory routes
-app.use('/api/companies', ensureDBConnection, companyRoutes);
-app.use('/api/products', ensureDBConnection, productRoutes);
-app.use('/api/product-types', ensureDBConnection, productTypeRoutes);
-app.use('/api/material-requests', ensureDBConnection, materialRequestRoutes);
-app.use('/api/purchase-orders', ensureDBConnection, purchaseOrderRoutes);
-app.use('/api/po-receipts', ensureDBConnection, poReceiptRoutes);
-app.use('/api/inventory', ensureDBConnection, inventoryRoutes);
-app.use('/api/discounts', ensureDBConnection, discountRoutes);
-app.use('/api/uploads', uploadRoutes); // No DB connection needed for file uploads
-app.use('/api', ensureDBConnection, specificationRoutes);
-app.use('/api/specification-templates', ensureDBConnection, specificationTemplateRoutes);
-app.use('/api/property-definitions', ensureDBConnection, propertyDefinitionRoutes);
-app.use('/api/units-of-measure', ensureDBConnection, unitOfMeasureRoutes);
+if (companyRoutes) app.use('/api/companies', ensureDBConnection, companyRoutes);
+if (productRoutes) app.use('/api/products', ensureDBConnection, productRoutes);
+if (productTypeRoutes) app.use('/api/product-types', ensureDBConnection, productTypeRoutes);
+if (materialRequestRoutes) app.use('/api/material-requests', ensureDBConnection, materialRequestRoutes);
+if (purchaseOrderRoutes) app.use('/api/purchase-orders', ensureDBConnection, purchaseOrderRoutes);
+if (poReceiptRoutes) app.use('/api/po-receipts', ensureDBConnection, poReceiptRoutes);
+if (inventoryRoutes) app.use('/api/inventory', ensureDBConnection, inventoryRoutes);
+if (discountRoutes) app.use('/api/discounts', ensureDBConnection, discountRoutes);
+if (uploadRoutes) app.use('/api/uploads', uploadRoutes); // No DB connection needed for file uploads
+if (specificationRoutes) app.use('/api', ensureDBConnection, specificationRoutes);
+if (specificationTemplateRoutes) app.use('/api/specification-templates', ensureDBConnection, specificationTemplateRoutes);
+if (propertyDefinitionRoutes) app.use('/api/property-definitions', ensureDBConnection, propertyDefinitionRoutes);
+if (unitOfMeasureRoutes) app.use('/api/units-of-measure', ensureDBConnection, unitOfMeasureRoutes);
 
 // Version endpoint
 app.get('/api/version', (req, res) => {
@@ -555,7 +619,9 @@ app.get('/api/performance-test', async (req, res) => {
 });
 
 // Error handling middleware
-app.use(handleUploadError);
+if (handleUploadError) {
+  app.use(handleUploadError);
+}
 
 // Global error handler
 app.use((error, req, res, next) => {
