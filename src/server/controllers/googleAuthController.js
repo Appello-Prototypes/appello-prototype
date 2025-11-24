@@ -7,6 +7,16 @@ const googleAuthController = {
   // Can be used for login (no auth required) or connecting email (auth required)
   initiateConnection: async (req, res) => {
     try {
+      // Check if Google OAuth is configured
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(503).json({
+          success: false,
+          message: 'Google OAuth is not configured',
+          error: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables are required',
+          requiresConfiguration: true
+        });
+      }
+
       // For login, use backend callback URL (Google redirects here)
       // Backend then redirects to frontend with token
       const backendCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
@@ -25,7 +35,7 @@ const googleAuthController = {
       res.status(500).json({
         success: false,
         message: 'Failed to initiate Google connection',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        error: process.env.NODE_ENV === 'development' || process.env.VERCEL ? error.message : 'Internal server error'
       });
     }
   },
@@ -35,6 +45,11 @@ const googleAuthController = {
   // This is used for BOTH login and email connection
   handleCallback: async (req, res) => {
     try {
+      // Check if Google OAuth is configured
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=${encodeURIComponent('Google OAuth is not configured')}`);
+      }
+
       const { code, state, error } = req.query;
 
       if (error) {
@@ -126,8 +141,20 @@ const googleAuthController = {
   // Check if user has Google account connected
   getConnectionStatus: async (req, res) => {
     try {
-      const user = await User.findById(req.user.id).select('googleOAuth email name');
+      // Check if Google OAuth is configured
+      const isConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+      
+      if (!isConfigured) {
+        return res.json({
+          success: true,
+          isConfigured: false,
+          isConnected: false,
+          message: 'Google OAuth is not configured'
+        });
+      }
 
+      const user = await User.findById(req.user.id).select('googleOAuth email name');
+      
       const isConnected = !!(user.googleOAuth && user.googleOAuth.refreshToken);
       const email = user.googleOAuth?.email || null;
       const connectedAt = user.googleOAuth?.connectedAt || null;
