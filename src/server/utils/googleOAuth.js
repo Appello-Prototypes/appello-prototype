@@ -8,10 +8,15 @@ const oauth2Client = require('./oauth2Client');
  * @returns {String} Authorization URL
  */
 function getAuthUrl(state, redirectUri) {
+  // Check credentials first before creating client
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    throw new Error('Google OAuth2 credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
+  }
+  
   const client = oauth2Client();
   
   if (!client) {
-    throw new Error('Google OAuth2 credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
+    throw new Error('Google OAuth2 client creation failed. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
   }
   
   const scopes = [
