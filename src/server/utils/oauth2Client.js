@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 
 /**
  * Create OAuth2 client instance
+ * Returns null if credentials are not configured (instead of throwing)
  */
 function createOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -9,7 +10,10 @@ function createOAuth2Client() {
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback';
 
   if (!clientId || !clientSecret) {
-    throw new Error('Google OAuth2 credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
+    // Don't throw - return null so calling code can handle gracefully
+    // This prevents server crashes when Google OAuth is not configured
+    console.warn('⚠️  Google OAuth2 credentials not configured. Google SSO features will be disabled.');
+    return null;
   }
 
   return new google.auth.OAuth2(

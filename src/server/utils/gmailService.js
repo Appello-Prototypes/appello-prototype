@@ -20,6 +20,9 @@ async function sendPOEmailViaGmail({ user, po, supplier, pdfBuffer, toEmail }) {
 
     // Create Gmail client
     const client = oauth2Client();
+    if (!client) {
+      throw new Error('Google OAuth2 credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
+    }
     client.setCredentials({ access_token: accessToken });
     const gmail = google.gmail({ version: 'v1', auth: client });
 

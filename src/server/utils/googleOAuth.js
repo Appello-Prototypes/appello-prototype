@@ -10,6 +10,10 @@ const oauth2Client = require('./oauth2Client');
 function getAuthUrl(state, redirectUri) {
   const client = oauth2Client();
   
+  if (!client) {
+    throw new Error('Google OAuth2 credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
+  }
+  
   const scopes = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/userinfo.email',
@@ -35,6 +39,11 @@ function getAuthUrl(state, redirectUri) {
  */
 async function getTokensFromCode(code, redirectUri) {
   const client = oauth2Client();
+  
+  if (!client) {
+    throw new Error('Google OAuth2 credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
+  }
+  
   client.redirectUri = redirectUri;
 
   try {
