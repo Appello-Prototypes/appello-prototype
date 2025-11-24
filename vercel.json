@@ -27,8 +27,15 @@
       "destination": "/src/server/index.js"
     },
     {
-      "source": "/((?!api|socket\\.io|_next|.*\\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot|json|map)).*)",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": "text/html"
+        }
+      ]
     }
   ],
   "headers": [
