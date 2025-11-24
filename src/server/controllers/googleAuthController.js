@@ -126,23 +126,43 @@ const googleAuthController = {
 
       // Generate JWT token for app authentication
       const jwt = require('jsonwebtoken');
-      // Validate and sanitize JWT_EXPIRES_IN to ensure it's a valid value
-      // Handle all edge cases: undefined, null, empty string, whitespace-only, string 'undefined'
-      let jwtExpiresIn = process.env.JWT_EXPIRES_IN;
       
-      // Always default to '7d' - only use env var if it's a valid non-empty string
-      let validExpiresIn = '7d'; // Default fallback
-      
-      if (jwtExpiresIn && typeof jwtExpiresIn === 'string') {
-        jwtExpiresIn = jwtExpiresIn.trim();
-        // Only use if it's not empty and not the string 'undefined'
-        if (jwtExpiresIn.length > 0 && jwtExpiresIn !== 'undefined' && jwtExpiresIn !== 'null') {
-          validExpiresIn = jwtExpiresIn;
+      // CRITICAL: Ensure expiresIn is ALWAYS a valid value
+      // Use a helper function to guarantee we never pass invalid values
+      const getValidExpiresIn = () => {
+        const envValue = process.env.JWT_EXPIRES_IN;
+        
+        // If env var exists and is a valid string, use it
+        if (envValue && typeof envValue === 'string') {
+          const trimmed = envValue.trim();
+          // Validate it's not empty and not invalid strings
+          if (trimmed.length > 0 && 
+              trimmed !== 'undefined' && 
+              trimmed !== 'null' &&
+              trimmed !== '') {
+            return trimmed;
+          }
         }
-      }
+        
+        // Always return a safe default
+        return '7d';
+      };
       
-      // Log for debugging in production to help diagnose
-      console.log('JWT expiresIn - env value:', process.env.JWT_EXPIRES_IN, '| using:', validExpiresIn);
+      const validExpiresIn = getValidExpiresIn();
+      
+      // Log for debugging - this will help us see what's happening
+      console.log('[JWT] Environment check:', {
+        JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
+        type: typeof process.env.JWT_EXPIRES_IN,
+        validExpiresIn: validExpiresIn,
+        validExpiresInType: typeof validExpiresIn
+      });
+      
+      // Double-check before calling jwt.sign
+      if (!validExpiresIn || (typeof validExpiresIn === 'string' && validExpiresIn.trim().length === 0)) {
+        console.error('[JWT] CRITICAL: validExpiresIn is invalid:', validExpiresIn);
+        throw new Error('JWT expiresIn validation failed - this should never happen');
+      }
       
       const appToken = jwt.sign(
         { id: user._id },
