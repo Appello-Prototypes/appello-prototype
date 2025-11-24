@@ -32,12 +32,15 @@ const googleAuthController = {
       });
     } catch (error) {
       console.error('Error initiating Google OAuth:', error);
+      console.error('Error stack:', error.stack);
       // Always show error message in production for debugging
-      res.status(500).json({
+      const errorMessage = error.message || 'Internal server error';
+      const isConfigError = errorMessage.includes('not configured') || errorMessage.includes('credentials');
+      res.status(isConfigError ? 503 : 500).json({
         success: false,
-        message: 'Failed to initiate Google connection',
-        error: error.message || 'Internal server error',
-        requiresConfiguration: error.message?.includes('not configured') || false
+        message: isConfigError ? 'Google OAuth is not configured' : 'Failed to initiate Google connection',
+        error: errorMessage,
+        requiresConfiguration: isConfigError
       });
     }
   },
