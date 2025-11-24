@@ -8,7 +8,13 @@ const googleAuthController = {
   initiateConnection: async (req, res) => {
     try {
       // Check if Google OAuth is configured
-      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      const hasClientId = !!process.env.GOOGLE_CLIENT_ID;
+      const hasClientSecret = !!process.env.GOOGLE_CLIENT_SECRET;
+      
+      console.log('Google OAuth check:', { hasClientId, hasClientSecret });
+      
+      if (!hasClientId || !hasClientSecret) {
+        console.log('Google OAuth not configured, returning 503');
         return res.status(503).json({
           success: false,
           message: 'Google OAuth is not configured',
