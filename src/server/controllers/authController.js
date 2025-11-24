@@ -4,10 +4,20 @@ const { validationResult } = require('express-validator');
 
 const generateToken = (userId) => {
   // Validate and sanitize JWT_EXPIRES_IN to ensure it's a valid value
-  const jwtExpiresIn = process.env.JWT_EXPIRES_IN?.trim();
-  const validExpiresIn = jwtExpiresIn && jwtExpiresIn.length > 0 
-    ? jwtExpiresIn 
-    : '7d';
+  // Handle all edge cases: undefined, null, empty string, whitespace-only, string 'undefined'
+  let jwtExpiresIn = process.env.JWT_EXPIRES_IN;
+  
+  // Always default to '7d' - only use env var if it's a valid non-empty string
+  let validExpiresIn = '7d'; // Default fallback
+  
+  if (jwtExpiresIn && typeof jwtExpiresIn === 'string') {
+    jwtExpiresIn = jwtExpiresIn.trim();
+    // Only use if it's not empty and not the string 'undefined'
+    if (jwtExpiresIn.length > 0 && jwtExpiresIn !== 'undefined' && jwtExpiresIn !== 'null') {
+      validExpiresIn = jwtExpiresIn;
+    }
+  }
+  
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: validExpiresIn,
   });

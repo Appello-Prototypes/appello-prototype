@@ -127,19 +127,22 @@ const googleAuthController = {
       // Generate JWT token for app authentication
       const jwt = require('jsonwebtoken');
       // Validate and sanitize JWT_EXPIRES_IN to ensure it's a valid value
+      // Handle all edge cases: undefined, null, empty string, whitespace-only, string 'undefined'
       let jwtExpiresIn = process.env.JWT_EXPIRES_IN;
-      if (jwtExpiresIn) {
-        jwtExpiresIn = jwtExpiresIn.trim();
-      }
-      // Ensure we have a valid value - default to '7d' if empty or invalid
-      const validExpiresIn = (jwtExpiresIn && jwtExpiresIn.length > 0 && jwtExpiresIn !== 'undefined') 
-        ? jwtExpiresIn 
-        : '7d';
       
-      // Log for debugging (remove in production if needed)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('JWT expiresIn:', validExpiresIn);
+      // Always default to '7d' - only use env var if it's a valid non-empty string
+      let validExpiresIn = '7d'; // Default fallback
+      
+      if (jwtExpiresIn && typeof jwtExpiresIn === 'string') {
+        jwtExpiresIn = jwtExpiresIn.trim();
+        // Only use if it's not empty and not the string 'undefined'
+        if (jwtExpiresIn.length > 0 && jwtExpiresIn !== 'undefined' && jwtExpiresIn !== 'null') {
+          validExpiresIn = jwtExpiresIn;
+        }
       }
+      
+      // Log for debugging in production to help diagnose
+      console.log('JWT expiresIn - env value:', process.env.JWT_EXPIRES_IN, '| using:', validExpiresIn);
       
       const appToken = jwt.sign(
         { id: user._id },
