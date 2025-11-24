@@ -108,6 +108,12 @@ app.use(helmet({
   crossOriginOpenerPolicy: false, // Disable COOP to allow OAuth popups
   contentSecurityPolicy: false, // Disable CSP for development
 }));
+
+// Explicitly set COOP header to unsafe-none for OAuth popups (override any defaults)
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  next();
+});
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.CLIENT_URL || 'https://task-management-kappa-plum.vercel.app'
