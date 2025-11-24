@@ -54,11 +54,17 @@ export default function Settings() {
 
       // Listen for popup to close or receive message
       const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed)
-          setConnecting(false)
-          // Refresh status
-          queryClient.invalidateQueries(['google-connection-status'])
+        try {
+          // Check if popup is closed (may fail due to COOP policy)
+          if (popup.closed) {
+            clearInterval(checkClosed)
+            setConnecting(false)
+            // Refresh status
+            queryClient.invalidateQueries(['google-connection-status'])
+          }
+        } catch (e) {
+          // COOP policy blocks access to popup.closed - that's OK, rely on postMessage instead
+          // Don't clear interval, let postMessage handler deal with it
         }
       }, 500)
 

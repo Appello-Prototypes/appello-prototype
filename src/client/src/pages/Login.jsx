@@ -54,17 +54,23 @@ export default function Login() {
 
       // Listen for popup to close or navigate
       const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed)
-          setConnecting(false)
-          // Check if we have a token (user might have logged in)
-          if (localStorage.getItem('authToken')) {
-            toast.success('Login successful!')
-            navigate('/dashboard')
-          } else {
-            // Popup closed without completing auth
-            toast.error('Login cancelled or popup was closed')
+        try {
+          // Check if popup is closed (may fail due to COOP policy)
+          if (popup.closed) {
+            clearInterval(checkClosed)
+            setConnecting(false)
+            // Check if we have a token (user might have logged in)
+            if (localStorage.getItem('authToken')) {
+              toast.success('Login successful!')
+              navigate('/dashboard')
+            } else {
+              // Popup closed without completing auth
+              toast.error('Login cancelled or popup was closed')
+            }
           }
+        } catch (e) {
+          // COOP policy blocks access to popup.closed - that's OK, rely on postMessage instead
+          // Don't clear interval, let postMessage handler deal with it
         }
       }, 500)
       
