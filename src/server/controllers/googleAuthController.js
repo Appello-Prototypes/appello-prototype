@@ -126,10 +126,15 @@ const googleAuthController = {
 
       // Generate JWT token for app authentication
       const jwt = require('jsonwebtoken');
+      // Validate and sanitize JWT_EXPIRES_IN to ensure it's a valid value
+      const jwtExpiresIn = process.env.JWT_EXPIRES_IN?.trim();
+      const validExpiresIn = jwtExpiresIn && jwtExpiresIn.length > 0 
+        ? jwtExpiresIn 
+        : '7d';
       const appToken = jwt.sign(
         { id: user._id },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: validExpiresIn }
       );
 
       // Redirect to frontend with token

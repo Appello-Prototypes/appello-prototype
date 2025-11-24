@@ -3,8 +3,13 @@ const User = require('../models/User');
 const { validationResult } = require('express-validator');
 
 const generateToken = (userId) => {
+  // Validate and sanitize JWT_EXPIRES_IN to ensure it's a valid value
+  const jwtExpiresIn = process.env.JWT_EXPIRES_IN?.trim();
+  const validExpiresIn = jwtExpiresIn && jwtExpiresIn.length > 0 
+    ? jwtExpiresIn 
+    : '7d';
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    expiresIn: validExpiresIn,
   });
 };
 
