@@ -19,19 +19,18 @@
   ],
   "routes": [
     {
-      "handle": "filesystem"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "/src/server/index.js"
     },
     {
       "src": "/socket.io/(.*)",
       "dest": "/src/server/index.js"
-    },
+    }
+  ],
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/((?!api|socket\\.io|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ],
   "env": {
