@@ -9,6 +9,8 @@ export default defineConfig({
     {
       name: 'copy-redirects',
       closeBundle() {
+        const { writeFileSync } = require('fs')
+        
         // Copy _redirects file to dist during build
         const redirectsSource = join(__dirname, 'public', '_redirects')
         const redirectsDest = join(__dirname, 'dist', '_redirects')
@@ -19,6 +21,15 @@ export default defineConfig({
           } catch (error) {
             console.warn('⚠️  Could not copy _redirects:', error.message)
           }
+        }
+        
+        // Create _headers file in dist for Vercel (allows OAuth popups)
+        const headersDest = join(__dirname, 'dist', '_headers')
+        try {
+          writeFileSync(headersDest, '/*\n  Cross-Origin-Opener-Policy: unsafe-none\n')
+          console.log('✅ Created _headers file in dist')
+        } catch (error) {
+          console.warn('⚠️  Could not create _headers:', error.message)
         }
       },
     },
