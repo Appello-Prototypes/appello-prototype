@@ -127,10 +127,20 @@ const googleAuthController = {
       // Generate JWT token for app authentication
       const jwt = require('jsonwebtoken');
       // Validate and sanitize JWT_EXPIRES_IN to ensure it's a valid value
-      const jwtExpiresIn = process.env.JWT_EXPIRES_IN?.trim();
-      const validExpiresIn = jwtExpiresIn && jwtExpiresIn.length > 0 
+      let jwtExpiresIn = process.env.JWT_EXPIRES_IN;
+      if (jwtExpiresIn) {
+        jwtExpiresIn = jwtExpiresIn.trim();
+      }
+      // Ensure we have a valid value - default to '7d' if empty or invalid
+      const validExpiresIn = (jwtExpiresIn && jwtExpiresIn.length > 0 && jwtExpiresIn !== 'undefined') 
         ? jwtExpiresIn 
         : '7d';
+      
+      // Log for debugging (remove in production if needed)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('JWT expiresIn:', validExpiresIn);
+      }
+      
       const appToken = jwt.sign(
         { id: user._id },
         process.env.JWT_SECRET,

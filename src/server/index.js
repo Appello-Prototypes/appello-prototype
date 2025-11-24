@@ -105,6 +105,7 @@ const io = socketIo(server, {
 // Middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Allow OAuth popups
   contentSecurityPolicy: false, // Disable CSP for development
 }));
 app.use(cors({
