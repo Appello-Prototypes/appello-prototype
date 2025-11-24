@@ -27,7 +27,7 @@
       "dest": "/src/server/index.js"
     },
     {
-      "src": "/(.*)",
+      "src": "/((?!.*\\..*|api|socket\\.io).*)",
       "dest": "/index.html"
     }
   ],
