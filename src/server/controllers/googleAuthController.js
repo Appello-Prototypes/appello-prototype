@@ -25,7 +25,9 @@ const googleAuthController = {
 
       // For login, use backend callback URL (Google redirects here)
       // Backend then redirects to frontend with token
-      const backendCallbackUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+      // On Vercel, check x-forwarded-proto header for correct protocol
+      const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
+      const backendCallbackUri = `${protocol}://${req.get('host')}/api/auth/google/callback`;
       
       // State can be userId (for email connection) or 'login' (for initial login)
       const state = req.user ? req.user.id : (req.query.state || 'login');
