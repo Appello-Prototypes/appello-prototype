@@ -33,6 +33,17 @@
       "destination": "/index.html"
     }
   ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "unsafe-none"
+        }
+      ]
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   }
