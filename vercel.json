@@ -27,12 +27,6 @@
       "dest": "/src/server/index.js"
     }
   ],
-  "rewrites": [
-    {
-      "source": "/((?!api|socket\\.io|.*\\..*).*)",
-      "destination": "/index.html"
-    }
-  ],
   "env": {
     "NODE_ENV": "production"
   }
