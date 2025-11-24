@@ -625,12 +625,15 @@ if (handleUploadError) {
 
 // Global error handler
 app.use((error, req, res, next) => {
-  console.error('Global error handler:', error);
+  console.error('❌ Global error handler:', error.message);
+  console.error('Stack:', error.stack);
+  console.error('Request path:', req.path);
+  console.error('Request method:', req.method);
   
   res.status(error.status || 500).json({
     success: false,
     message: error.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+    ...(process.env.NODE_ENV === 'development' || process.env.VERCEL ? { stack: error.stack } : {})
   });
 });
 
