@@ -17,17 +17,15 @@
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/src/server/index.js"
+      "source": "/api/(.*)",
+      "destination": "/src/server/index.js"
     },
     {
-      "src": "/socket.io/(.*)",
-      "dest": "/src/server/index.js"
-    }
-  ],
-  "rewrites": [
+      "source": "/socket.io/(.*)",
+      "destination": "/src/server/index.js"
+    },
     {
       "source": "/((?!api|socket\\.io|_next|.*\\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot|json|map)).*)",
       "destination": "/index.html"
