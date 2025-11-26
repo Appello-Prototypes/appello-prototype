@@ -9,7 +9,8 @@ const productController = {
   getAllProducts: async (req, res) => {
     try {
       const { 
-        supplierId, 
+        manufacturerId,
+        distributorId,
         category, 
         isActive, 
         search, 
@@ -20,7 +21,31 @@ const productController = {
       } = req.query;
       
       const filter = {};
-      if (supplierId) filter.supplierId = supplierId;
+      // Support filtering by primary fields OR suppliers array (for multi-distributor products)
+      if (manufacturerId) {
+        filter.$or = [
+          { manufacturerId: manufacturerId },
+          { 'suppliers.manufacturerId': manufacturerId }
+        ];
+      }
+      if (distributorId) {
+        if (filter.$or) {
+          // Combine with AND logic - product must match both manufacturer AND distributor
+          filter.$and = [
+            { $or: filter.$or },
+            { $or: [
+              { distributorId: distributorId },
+              { 'suppliers.distributorId': distributorId }
+            ]}
+          ];
+          delete filter.$or;
+        } else {
+          filter.$or = [
+            { distributorId: distributorId },
+            { 'suppliers.distributorId': distributorId }
+          ];
+        }
+      }
       if (productTypeId) filter.productTypeId = productTypeId;
       if (category) filter.category = category;
       if (isActive !== undefined) filter.isActive = isActive === 'true';
@@ -32,10 +57,12 @@ const productController = {
       }
       
       const products = await Product.find(filter)
-        .populate('supplierId', 'name companyType') // Legacy
-        .populate('suppliers.supplierId', 'name companyType') // New
+        .populate('manufacturerId', 'name companyType') // Manufacturer
+        .populate('distributorId', 'name companyType') // Distributor
         .populate('productTypeId', 'name slug') // Product type
-        .select('name description internalPartNumber supplierId suppliers productTypeId properties variants lastPrice unitOfMeasure category pricebookSection pricebookPageNumber pricebookPageName pricebookGroupCode isActive')
+        .populate('suppliers.distributorId', 'name companyType') // Distributor in suppliers array
+        .populate('suppliers.manufacturerId', 'name companyType') // Manufacturer in suppliers array
+        .select('name description internalPartNumber suppliers manufacturerId distributorId productTypeId properties variants lastPrice unitOfMeasure category pricebookSection pricebookPageNumber pricebookPageName pricebookGroupCode isActive')
         .sort({ pricebookSection: 1, pricebookPageNumber: 1, name: 1 })
         .lean();
       
@@ -56,8 +83,23 @@ const productController = {
   // GET /api/products/by-pricebook
   getProductsByPricebook: async (req, res) => {
     try {
-      const products = await Product.find({ isActive: true })
-        .select('name description variants pricebookSection pricebookPageNumber pricebookPageName pricebookGroupCode category')
+      const { distributorId } = req.query;
+      
+      // Build filter - if distributorId provided, only show products available from that distributor
+      const filter = { isActive: true };
+      if (distributorId) {
+        filter.$or = [
+          { distributorId: distributorId },
+          { 'suppliers.distributorId': distributorId }
+        ];
+      }
+      
+      const products = await Product.find(filter)
+        .populate('manufacturerId', 'name')
+        .populate('distributorId', 'name')
+        .populate('suppliers.distributorId', 'name')
+        .populate('suppliers.manufacturerId', 'name')
+        .select('name description variants pricebookSection pricebookPageNumber pricebookPageName pricebookGroupCode category manufacturerId distributorId suppliers')
         .sort({ pricebookSection: 1, pricebookPageNumber: 1, name: 1 })
         .lean();
       
@@ -69,6 +111,63 @@ const productController = {
         const pageNumber = product.pricebookPageNumber || '0';
         const pageName = product.pricebookPageName || 'Unknown Page';
         const groupCode = product.pricebookGroupCode || '';
+        
+        // Get distributor-specific pricing if distributorId is provided
+        let distributorPricing = null;
+        let manufacturerName = null;
+        let availableFromDistributors = [];
+        
+        if (distributorId) {
+          // Find pricing from the selected distributor
+          const supplierEntry = product.suppliers?.find(s => 
+            s.distributorId && s.distributorId._id.toString() === distributorId
+          );
+          
+          if (supplierEntry) {
+            distributorPricing = {
+              listPrice: supplierEntry.listPrice,
+              netPrice: supplierEntry.netPrice,
+              discountPercent: supplierEntry.discountPercent,
+              isPreferred: supplierEntry.isPreferred
+            };
+            manufacturerName = supplierEntry.manufacturerId?.name || product.manufacturerId?.name;
+          } else if (product.distributorId && product.distributorId._id.toString() === distributorId) {
+            // Use primary distributor pricing
+            distributorPricing = {
+              listPrice: product.pricing?.listPrice,
+              netPrice: product.pricing?.netPrice,
+              discountPercent: product.pricing?.discountPercent
+            };
+            manufacturerName = product.manufacturerId?.name;
+          }
+        } else {
+          // No distributor selected - show all distributors this product is available from
+          manufacturerName = product.manufacturerId?.name;
+          if (product.suppliers && product.suppliers.length > 0) {
+            availableFromDistributors = product.suppliers
+              .filter(s => s.distributorId)
+              .map(s => ({
+                distributorId: s.distributorId._id.toString(),
+                distributorName: s.distributorId.name,
+                listPrice: s.listPrice,
+                netPrice: s.netPrice,
+                discountPercent: s.discountPercent
+              }));
+          } else if (product.distributorId) {
+            availableFromDistributors = [{
+              distributorId: product.distributorId._id.toString(),
+              distributorName: product.distributorId.name,
+              listPrice: product.pricing?.listPrice,
+              netPrice: product.pricing?.netPrice,
+              discountPercent: product.pricing?.discountPercent
+            }];
+          }
+        }
+        
+        // Skip product if distributorId is specified but product not available from that distributor
+        if (distributorId && !distributorPricing && !(product.distributorId && product.distributorId._id.toString() === distributorId)) {
+          return;
+        }
         
         if (!pricebookStructure[section]) {
           pricebookStructure[section] = {
@@ -92,7 +191,11 @@ const productController = {
           name: product.name,
           description: product.description,
           variantCount: product.variants?.length || 0,
-          category: product.category
+          category: product.category,
+          manufacturerName,
+          distributorPricing,
+          availableFromDistributors: distributorId ? null : availableFromDistributors, // Only show if no distributor selected
+          hasMultipleDistributors: availableFromDistributors.length > 1
         });
       });
       
@@ -110,7 +213,8 @@ const productController = {
       
       res.json({
         success: true,
-        data: result
+        data: result,
+        distributorId: distributorId || null
       });
     } catch (error) {
       console.error('Error in getProductsByPricebook:', error);
@@ -133,9 +237,13 @@ const productController = {
       }
 
       const product = await Product.findById(req.params.id)
-        .populate('supplierId') // Legacy
-        .populate('suppliers.supplierId') // New
+        .populate('suppliers.distributorId', 'name companyType') // Distributor (who we buy from)
+        .populate('suppliers.manufacturerId', 'name companyType') // Manufacturer (who makes it)
+        .populate('manufacturerId', 'name companyType') // Primary manufacturer
+        .populate('distributorId', 'name companyType') // Primary distributor
         .populate('productTypeId') // Product type
+        .populate('variants.suppliers.distributorId', 'name companyType') // Variant distributors
+        .populate('variants.suppliers.manufacturerId', 'name companyType') // Variant manufacturers
         .lean();
 
       if (!product) {
@@ -182,16 +290,6 @@ const productController = {
         });
       }
 
-      // Validate supplier exists
-      if (productData.supplierId) {
-        const supplier = await Company.findById(productData.supplierId);
-        if (!supplier) {
-          return res.status(400).json({
-            success: false,
-            message: 'Supplier not found'
-          });
-        }
-      }
 
       // Validate product type exists if provided
       if (productData.productTypeId) {
@@ -259,8 +357,8 @@ const productController = {
         { $set: updateData },
         { new: true, runValidators: true }
       )
-        .populate('supplierId') // Legacy
-        .populate('suppliers.supplierId') // New
+        .populate('manufacturerId', 'name companyType') // Manufacturer
+        .populate('distributorId', 'name companyType') // Distributor
         .populate('productTypeId') // Product type
         .lean();
 
@@ -288,7 +386,7 @@ const productController = {
   // GET /api/products/search/autocomplete
   searchProducts: async (req, res) => {
     try {
-      const { q, supplierId, filters, productTypeId, jobId, systemId, areaId, pipeType, pipeDiameter } = req.query;
+      const { q, filters, productTypeId, jobId, systemId, areaId, pipeType, pipeDiameter, distributorId, manufacturerId } = req.query;
       
       // Parse filters if provided as JSON string
       let propertyFilters = {};
@@ -300,47 +398,41 @@ const productController = {
         }
       }
       
-      // Build filter - support both text search and supplier filtering
+      // Build filter - support both text search and distributor/manufacturer filtering
       const filter = {
         isActive: true
       };
       
-      // Convert supplierId to ObjectId if provided
-      let supplierObjectId = null;
-      let supplierIdStr = null;
-      if (supplierId) {
-        if (mongoose.Types.ObjectId.isValid(supplierId)) {
-          try {
-            supplierObjectId = new mongoose.Types.ObjectId(supplierId);
-            supplierIdStr = supplierObjectId.toString();
-          } catch (e) {
-            console.error('Error converting supplierId to ObjectId:', e);
-            supplierObjectId = null;
-          }
-        } else {
-          console.warn('Invalid supplierId format:', supplierId);
+      // Filter by distributor if provided
+      if (distributorId) {
+        if (mongoose.Types.ObjectId.isValid(distributorId)) {
+          filter.$or = [
+            { distributorId: new mongoose.Types.ObjectId(distributorId) },
+            { 'suppliers.distributorId': new mongoose.Types.ObjectId(distributorId) }
+          ];
         }
       }
       
-      // Validate supplierId if provided
-      if (supplierId && !supplierObjectId) {
-        // If supplierId was provided but is invalid, return empty results instead of error
-        // This allows the UI to work even if there's a data issue
-        console.warn(`Invalid supplierId provided: ${supplierId}`);
-        return res.json({
-          success: true,
-          data: []
-        });
-      }
-      
-      // Supplier filter conditions
-      const supplierConditions = [];
-      if (supplierObjectId) {
-        supplierConditions.push(
-          { supplierId: supplierObjectId }, // Legacy
-          { 'suppliers.supplierId': supplierObjectId }, // New suppliers array
-          { 'variants.suppliers.supplierId': supplierObjectId } // Variant suppliers
-        );
+      // Filter by manufacturer if provided
+      if (manufacturerId) {
+        if (mongoose.Types.ObjectId.isValid(manufacturerId)) {
+          if (filter.$or) {
+            // Combine with AND logic
+            filter.$and = [
+              { $or: filter.$or },
+              { $or: [
+                { manufacturerId: new mongoose.Types.ObjectId(manufacturerId) },
+                { 'suppliers.manufacturerId': new mongoose.Types.ObjectId(manufacturerId) }
+              ]}
+            ];
+            delete filter.$or;
+          } else {
+            filter.$or = [
+              { manufacturerId: new mongoose.Types.ObjectId(manufacturerId) },
+              { 'suppliers.manufacturerId': new mongoose.Types.ObjectId(manufacturerId) }
+            ];
+          }
+        }
       }
       
       // Text search conditions (only if search term provided)
@@ -392,9 +484,6 @@ const productController = {
       
       // Combine conditions - ensure we always have a valid filter
       const baseConditions = [];
-      if (supplierConditions.length > 0) {
-        baseConditions.push({ $or: supplierConditions });
-      }
       if (textSearchConditions.length > 0) {
         baseConditions.push({ $or: textSearchConditions });
       }
@@ -410,9 +499,10 @@ const productController = {
 
       // Build query - populate separately to avoid nested array issues
       const products = await Product.find(filter)
-        .populate('supplierId', 'name') // Legacy
         .populate('productTypeId', 'name slug')
-        .select('name description internalPartNumber supplierId suppliers productTypeId properties variants lastPrice unitOfMeasure category pricebookSection pricebookPageNumber pricebookPageName')
+        .populate('suppliers.distributorId', 'name companyType')
+        .populate('suppliers.manufacturerId', 'name companyType')
+        .select('name description internalPartNumber suppliers manufacturerId distributorId productTypeId properties variants lastPrice unitOfMeasure category pricebookSection pricebookPageNumber pricebookPageName isActive inventoryTracking lastPurchasedDate createdAt updatedAt')
         .limit(500) // Increased limit to show more products (was 200)
         .sort({ name: 1 })
         .lean();
@@ -420,9 +510,6 @@ const productController = {
       // Debug logging
       if (process.env.NODE_ENV === 'development') {
         console.log(`🔍 Product search: Found ${products.length} products after MongoDB query`);
-        if (supplierObjectId) {
-          console.log(`   Supplier filter: ${supplierIdStr}`);
-        }
         if (Object.keys(propertyFilters).length > 0) {
           console.log(`   Property filters:`, propertyFilters);
         }
@@ -444,96 +531,34 @@ const productController = {
         }
       }
       
-      // Manually populate suppliers array if needed (for better error handling)
-      if (products.length > 0 && products.some(p => p.suppliers && p.suppliers.length > 0)) {
-        const supplierIds = new Set();
-        products.forEach(product => {
-          if (product.suppliers) {
-            product.suppliers.forEach(s => {
-              if (s.supplierId && mongoose.Types.ObjectId.isValid(s.supplierId)) {
-                supplierIds.add(s.supplierId.toString());
-              }
-            });
-          }
-        });
-        
-        if (supplierIds.size > 0) {
-          try {
-            const suppliers = await Company.find({ 
-              _id: { $in: Array.from(supplierIds).map(id => new mongoose.Types.ObjectId(id)) }
-            }).select('name').lean();
-            
-            const supplierMap = {};
-            suppliers.forEach(s => {
-              supplierMap[s._id.toString()] = s;
-            });
-            
-            // Attach supplier names to products
-            products.forEach(product => {
-              if (product.suppliers) {
-                product.suppliers.forEach(s => {
-                  if (s.supplierId && supplierMap[s.supplierId.toString()]) {
-                    s.supplierId = { ...supplierMap[s.supplierId.toString()], _id: s.supplierId };
-                  }
-                });
-              }
-            });
-          } catch (populateError) {
-            console.warn('Error populating suppliers:', populateError.message);
-            // Continue without populating - not critical
-          }
-        }
-      }
 
       // Format results to include variants as separate options
       const results = [];
       products.forEach(product => {
         try {
-          // Helper to safely get supplier ID string
-          const getSupplierIdString = (supplierId) => {
-            if (!supplierId) return null;
-            if (typeof supplierId === 'string') return supplierId;
-            if (supplierId._id) return supplierId._id.toString();
-            if (supplierId.toString) return supplierId.toString();
-            return null;
-          };
-          
-          // Check if product matches supplier filter (used for both product and variants)
-          const productSupplierIdStr = getSupplierIdString(product.supplierId);
-          // Use the supplierIdStr from outer scope (already defined above)
-          
-          const hasMatchingSupplier = !supplierObjectId || 
-            (productSupplierIdStr === supplierIdStr) ||
-            (product.suppliers && product.suppliers.some(s => {
-              const sIdStr = getSupplierIdString(s.supplierId);
-              return sIdStr === supplierIdStr;
-            }));
-          
-          const productMatchesSupplier = hasMatchingSupplier || !supplierObjectId;
-          
-          // Add base product (if it has suppliers matching the filter)
-          // Only add base product if it has NO variants (products with variants should show variants instead)
-          if (productMatchesSupplier && (!product.variants || product.variants.length === 0)) {
-            // Get pricing for the selected supplier
+          // Add base product (only if it has NO variants - products with variants should show variants instead)
+          if (!product.variants || product.variants.length === 0) {
+            // Get pricing from first supplier entry (if available)
             let unitPrice = product.lastPrice || 0;
             let supplierPartNumber = '';
             let listPrice = 0;
             let netPrice = 0;
             let discountPercent = 0;
             
-            if (supplierObjectId && product.suppliers && Array.isArray(product.suppliers)) {
-              const supplierInfo = product.suppliers.find(s => {
-                const sIdStr = getSupplierIdString(s.supplierId);
-                return sIdStr === supplierIdStr;
-              });
-              if (supplierInfo) {
-                unitPrice = supplierInfo.netPrice || supplierInfo.listPrice || supplierInfo.lastPrice || 0;
-                listPrice = supplierInfo.listPrice || supplierInfo.lastPrice || 0;
-                netPrice = supplierInfo.netPrice || unitPrice;
-                discountPercent = supplierInfo.discountPercent || 0;
-                supplierPartNumber = supplierInfo.supplierPartNumber || '';
-              }
+            if (product.suppliers && Array.isArray(product.suppliers) && product.suppliers.length > 0) {
+              const supplierInfo = product.suppliers[0]; // Use first supplier entry
+              unitPrice = supplierInfo.netPrice || supplierInfo.listPrice || supplierInfo.lastPrice || product.lastPrice || 0;
+              listPrice = supplierInfo.listPrice || supplierInfo.lastPrice || product.lastPrice || 0;
+              netPrice = supplierInfo.netPrice || unitPrice;
+              discountPercent = supplierInfo.discountPercent || 0;
+              supplierPartNumber = supplierInfo.supplierPartNumber || '';
             }
+            
+            // Get product type name if available
+            const productTypeName = product.productTypeId?.name || (typeof product.productTypeId === 'object' && product.productTypeId?.name) || null;
+            
+            // Get supplier count
+            const supplierCount = product.suppliers?.length || 0;
             
             results.push({
               _id: product._id,
@@ -554,13 +579,20 @@ const productController = {
               variantCount: 0,
               variantProperties: product.properties instanceof Map 
                 ? Object.fromEntries(product.properties) 
-                : (product.properties || {})
+                : (product.properties || {}),
+              // Additional insights for table view
+              productTypeName: productTypeName,
+              productType: product.productTypeId,
+              suppliers: product.suppliers || [],
+              manufacturerId: product.manufacturerId, // Populated with name
+              distributorId: product.distributorId, // Populated with name
+              isActive: product.isActive !== false,
+              inventoryTracking: product.inventoryTracking,
+              lastPurchasedDate: product.lastPurchasedDate
             });
           }
           
           // Add variants if they exist
-          // CRITICAL: Always include variants for products that match supplier filter
-          // OR include variants that have pricing (user can configure supplier-specific pricing later)
           if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
             product.variants.forEach((variant, variantIndex) => {
               try {
@@ -568,64 +600,23 @@ const productController = {
                 if (!variant || variant.isActive === false) {
                   return;
                 }
-                  // Check if variant has matching supplier
-                  const variantHasMatchingSupplier = variant.suppliers && Array.isArray(variant.suppliers) && variant.suppliers.some(s => {
-                    const sIdStr = getSupplierIdString(s.supplierId);
-                    return sIdStr === supplierIdStr;
-                  });
-                  
-                  // Check if variant has pricing (any pricing at all)
-                  // Handle both number and string values, and check for truthy values > 0
-                  const listPrice = variant.pricing?.listPrice;
-                  const netPrice = variant.pricing?.netPrice;
-                  const lastPrice = variant.pricing?.lastPrice;
-                  
-                  const hasVariantPricing = variant.pricing && (
-                    (listPrice != null && Number(listPrice) > 0) || 
-                    (netPrice != null && Number(netPrice) > 0) || 
-                    (lastPrice != null && Number(lastPrice) > 0)
-                  );
-                  
-                  // Include variant if:
-                  // 1. No supplier filter (show all variants)
-                  // 2. Parent product matches supplier (show all variants of matching products)  
-                  // 3. Variant has matching supplier (even if product doesn't match)
-                  // 4. Variant has pricing (show variants with pricing even if no supplier match)
-                  // 
-                  // IMPORTANT: If product matches supplier, show ALL its variants so user can configure
-                  // ALSO: Always show variants that have pricing (user can configure supplier later)
-                  const shouldIncludeVariant = !supplierObjectId || 
-                    productMatchesSupplier ||  // Show all variants if product matches
-                    variantHasMatchingSupplier || 
-                    hasVariantPricing;
-                  
-                  if (shouldIncludeVariant) {
-                    // Get variant pricing for the selected supplier
-                    let variantUnitPrice = variant.pricing?.netPrice || variant.pricing?.listPrice || variant.pricing?.lastPrice || 0;
-                    let variantSupplierPartNumber = '';
-                    let variantSupplierInfo = null;
-                    
-                    if (supplierObjectId && variant.suppliers && Array.isArray(variant.suppliers)) {
-                      variantSupplierInfo = variant.suppliers.find(s => {
-                        const sIdStr = getSupplierIdString(s.supplierId);
-                        return sIdStr === supplierIdStr;
-                      });
-                      if (variantSupplierInfo) {
-                        variantUnitPrice = variantSupplierInfo.netPrice || variantSupplierInfo.listPrice || variantSupplierInfo.lastPrice || 0;
-                        variantSupplierPartNumber = variantSupplierInfo.supplierPartNumber || '';
-                      }
-                    }
-                    
-                    // If still no price, try product-level supplier pricing as fallback
-                    if (variantUnitPrice === 0 && supplierObjectId && product.suppliers && Array.isArray(product.suppliers)) {
-                      const productSupplierInfo = product.suppliers.find(s => {
-                        const sIdStr = getSupplierIdString(s.supplierId);
-                        return sIdStr === supplierIdStr;
-                      });
-                      if (productSupplierInfo) {
-                        variantUnitPrice = productSupplierInfo.netPrice || productSupplierInfo.listPrice || productSupplierInfo.lastPrice || 0;
-                      }
-                    }
+                
+                // Get variant pricing from first supplier entry (if available)
+                let variantUnitPrice = variant.pricing?.netPrice || variant.pricing?.listPrice || variant.pricing?.lastPrice || 0;
+                let variantSupplierPartNumber = '';
+                let variantSupplierInfo = null;
+                
+                if (variant.suppliers && Array.isArray(variant.suppliers) && variant.suppliers.length > 0) {
+                  variantSupplierInfo = variant.suppliers[0]; // Use first supplier entry
+                  variantUnitPrice = variantSupplierInfo.netPrice || variantSupplierInfo.listPrice || variantSupplierInfo.lastPrice || variantUnitPrice || 0;
+                  variantSupplierPartNumber = variantSupplierInfo.supplierPartNumber || '';
+                }
+                
+                // If still no price, try product-level supplier pricing as fallback
+                if (variantUnitPrice === 0 && product.suppliers && Array.isArray(product.suppliers) && product.suppliers.length > 0) {
+                  const productSupplierInfo = product.suppliers[0];
+                  variantUnitPrice = productSupplierInfo.netPrice || productSupplierInfo.listPrice || productSupplierInfo.lastPrice || 0;
+                }
                     
                     // Ensure variant._id is converted to string properly
                     if (!variant._id) {
@@ -644,6 +635,12 @@ const productController = {
                     const listPrice = variantSupplierPricing.listPrice || variantSupplierPricing.lastPrice || variantPricing.listPrice || variantPricing.lastPrice || 0;
                     const netPrice = variantSupplierPricing.netPrice || variantPricing.netPrice || variantUnitPrice || listPrice;
                     const discountPercent = variantSupplierPricing.discountPercent || variantPricing.discountPercent || 0;
+                    
+                    // Get product type name if available
+                    const productTypeName = product.productTypeId?.name || (typeof product.productTypeId === 'object' && product.productTypeId?.name) || null;
+                    
+                    // Get supplier count
+                    const supplierCount = product.suppliers?.length || 0;
                     
                     const variantResult = {
                       _id: `${productIdStr}_${variantIdStr}`,
@@ -668,11 +665,19 @@ const productController = {
                           : (typeof variant.properties === 'object' && variant.properties !== null && !Array.isArray(variant.properties)
                               ? variant.properties 
                               : {})
-                      ) : {}
+                      ) : {},
+                      // Additional insights for table view
+                      productTypeName: productTypeName,
+              productType: product.productTypeId,
+              suppliers: product.suppliers || [],
+              manufacturerId: product.manufacturerId,
+              distributorId: product.distributorId,
+              isActive: product.isActive !== false,
+                      inventoryTracking: product.inventoryTracking,
+                      lastPurchasedDate: product.lastPurchasedDate
                     };
                     
                     results.push(variantResult);
-                  }
               } catch (variantError) {
                 console.warn('Error processing variant:', variantError.message);
                 // Continue with next variant
@@ -708,7 +713,6 @@ const productController = {
       console.error('Error stack:', error?.stack);
       console.error('Request params:', { 
         q: req.query.q, 
-        supplierId: req.query.supplierId,
         filters: req.query.filters,
         productTypeId: req.query.productTypeId
       });
@@ -722,6 +726,7 @@ const productController = {
   },
 
   // GET /api/products/:id/suppliers
+  // Returns manufacturers (suppliers) for this product
   getProductSuppliers: async (req, res) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -732,7 +737,9 @@ const productController = {
       }
 
       const product = await Product.findById(req.params.id)
-        .populate('suppliers.supplierId', 'name companyType contact address')
+        .populate('suppliers.manufacturerId', 'name companyType contact address') // Manufacturers
+        .populate('suppliers.distributorId', 'name companyType') // Distributors
+        .populate('manufacturerId', 'name companyType') // Primary manufacturer
         .lean();
 
       if (!product) {
@@ -742,21 +749,47 @@ const productController = {
         });
       }
 
-      // Format suppliers with product-specific info
-      const suppliers = product.suppliers.map(supplier => ({
-        supplier: supplier.supplierId,
-        supplierPartNumber: supplier.supplierPartNumber,
-        listPrice: supplier.listPrice,
-        netPrice: supplier.netPrice,
-        discountPercent: supplier.discountPercent,
-        lastPrice: supplier.lastPrice && supplier.lastPrice > 0 ? supplier.lastPrice : undefined,
-        lastPurchasedDate: supplier.lastPurchasedDate,
-        isPreferred: supplier.isPreferred
-      }));
+      // Extract unique manufacturers from suppliers array
+      const manufacturerMap = new Map();
+      
+      // Add primary manufacturer if exists
+      if (product.manufacturerId) {
+        manufacturerMap.set(product.manufacturerId._id.toString(), {
+          manufacturer: product.manufacturerId,
+          supplierPartNumber: null,
+          listPrice: null,
+          netPrice: null,
+          discountPercent: null,
+          lastPrice: null,
+          lastPurchasedDate: null,
+          isPreferred: false
+        });
+      }
+      
+      // Add manufacturers from suppliers array
+      product.suppliers.forEach(supplier => {
+        if (supplier.manufacturerId) {
+          const manId = supplier.manufacturerId._id.toString();
+          if (!manufacturerMap.has(manId)) {
+            manufacturerMap.set(manId, {
+              manufacturer: supplier.manufacturerId,
+              supplierPartNumber: supplier.supplierPartNumber,
+              listPrice: supplier.listPrice,
+              netPrice: supplier.netPrice,
+              discountPercent: supplier.discountPercent,
+              lastPrice: supplier.lastPrice && supplier.lastPrice > 0 ? supplier.lastPrice : undefined,
+              lastPurchasedDate: supplier.lastPurchasedDate,
+              isPreferred: supplier.isPreferred
+            });
+          }
+        }
+      });
+
+      const manufacturers = Array.from(manufacturerMap.values());
 
       res.json({
         success: true,
-        data: suppliers
+        data: manufacturers
       });
     } catch (error) {
       console.error('Error in getProductSuppliers:', error);
@@ -1198,7 +1231,6 @@ const productController = {
           // Check if product exists (by name and supplier)
           const existing = await Product.findOne({
             name: productData.name,
-            supplierId: productData.supplierId
           });
 
           if (existing) {
@@ -1231,6 +1263,84 @@ const productController = {
       res.status(500).json({
         success: false,
         message: 'Error importing CSV',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  },
+
+  // GET /api/products/by-distributor/:distributorId
+  getProductsByDistributor: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.distributorId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid distributor ID format'
+        });
+      }
+
+      // Find products where this distributor is primary OR in suppliers array
+      const products = await Product.find({
+        $or: [
+          { distributorId: req.params.distributorId },
+          { 'suppliers.distributorId': req.params.distributorId }
+        ],
+        isActive: true
+      })
+        .populate('manufacturerId', 'name companyType')
+        .populate('distributorId', 'name companyType')
+        .populate('productTypeId', 'name slug')
+        .select('name description manufacturerId distributorId productTypeId variants pricebookSection pricebookPageNumber pricebookPageName')
+        .sort({ pricebookSection: 1, pricebookPageNumber: 1, name: 1 })
+        .lean();
+
+      res.json({
+        success: true,
+        data: products
+      });
+    } catch (error) {
+      console.error('Error in getProductsByDistributor:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching products by distributor',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  },
+
+  // GET /api/products/by-manufacturer/:manufacturerId
+  getProductsByManufacturer: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.manufacturerId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid manufacturer ID format'
+        });
+      }
+
+      // Find products where this manufacturer is primary OR in suppliers array
+      const products = await Product.find({
+        $or: [
+          { manufacturerId: req.params.manufacturerId },
+          { 'suppliers.manufacturerId': req.params.manufacturerId }
+        ],
+        isActive: true
+      })
+        .populate('manufacturerId', 'name companyType')
+        .populate('distributorId', 'name companyType')
+        .populate('productTypeId', 'name slug')
+        .select('name description manufacturerId distributorId productTypeId variants pricebookSection pricebookPageNumber pricebookPageName')
+        .sort({ pricebookSection: 1, pricebookPageNumber: 1, name: 1 })
+        .lean();
+
+      res.json({
+        success: true,
+        data: products
+      });
+    } catch (error) {
+      console.error('Error in getProductsByManufacturer:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching products by manufacturer',
         error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }

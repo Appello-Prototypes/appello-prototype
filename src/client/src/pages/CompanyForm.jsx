@@ -157,8 +157,9 @@ export default function CompanyForm() {
                 required
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
+                <option value="customer">Customer</option>
                 <option value="supplier">Supplier</option>
-                <option value="client">Client</option>
+                <option value="distributor">Distributor</option>
                 <option value="subcontractor">Subcontractor</option>
                 <option value="other">Other</option>
               </select>

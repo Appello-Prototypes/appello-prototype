@@ -481,6 +481,56 @@
         ],
         "format": "board"
       }
+    },
+    {
+      "name": "ELTUA",
+      "completedAt": "2025-11-24T22:51:54.468Z",
+      "result": {
+        "productId": "6924e18a35368e9d8a5e0a0c",
+        "productName": "ELTUA",
+        "variantsCreated": 60,
+        "format": "elastomeric-pipe-insulation"
+      }
+    },
+    {
+      "name": "ELTUK",
+      "completedAt": "2025-11-25T02:02:10.336Z",
+      "result": {
+        "productId": "69250e2135368e9d8a5e1094",
+        "productName": "ELTUK",
+        "variantsCreated": 121,
+        "format": "elastomeric-pipe-insulation"
+      }
+    },
+    {
+      "name": "1.1 FIBREGLASS PIPE ASJ LIST",
+      "completedAt": "2025-11-25T16:57:03.786Z",
+      "result": {
+        "productId": "6925dfde40d74d43f7c1c426",
+        "productName": "FIBREGLASS PIPE WITH ASJ",
+        "variantsCreated": 280,
+        "format": "pipe-insulation"
+      }
+    },
+    {
+      "name": "ELTCA",
+      "completedAt": "2025-11-25T17:02:59.246Z",
+      "result": {
+        "productId": "6925e14335368e9d8a5e35ce",
+        "productName": "ELTCA",
+        "variantsCreated": 60,
+        "format": "elastomeric-pipe-insulation"
+      }
+    },
+    {
+      "name": "ELTCK",
+      "completedAt": "2025-11-25T17:03:04.768Z",
+      "result": {
+        "productId": "6925e14835368e9d8a5e35d0",
+        "productName": "ELTCK",
+        "variantsCreated": 119,
+        "format": "elastomeric-pipe-insulation"
+      }
     }
   ],
   "failed": [
@@ -553,7 +603,22 @@
       "name": "INDUSTRIAL FLEXIBLE BATTS",
       "failedAt": "2025-11-23T23:42:45.523Z",
       "error": "No board products found in sheet"
+    },
+    {
+      "name": "ELTUA",
+      "failedAt": "2025-11-24T22:45:38.820Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-ELTUA.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "1.1 FIBREGLASS PIPE ASJ LIST",
+      "failedAt": "2025-11-25T16:55:54.137Z",
+      "error": "Sheet data not found. Please create /Users/coreyshelson/task-management/scripts/sheet-data-1_1_FIBREGLASS_PIPE_ASJ_LIST.json with the sheet data as a JSON array of rows, or provide data via --data flag."
+    },
+    {
+      "name": "ELTLSA",
+      "failedAt": "2025-11-25T17:03:11.032Z",
+      "error": "No valid variants found in sheet"
     }
   ],
-  "lastUpdated": "2025-11-23T23:43:04.549Z"
+  "lastUpdated": "2025-11-25T17:03:11.032Z"
 }

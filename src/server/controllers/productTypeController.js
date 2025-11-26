@@ -220,8 +220,11 @@ const productTypeController = {
 
       const products = await Product.find({ productTypeId: req.params.id })
         .populate('productTypeId', 'name slug')
-        .populate('suppliers.supplierId', 'name')
-        .select('name description properties variants productTypeId')
+        .populate('manufacturerId', 'name companyType')
+        .populate('distributorId', 'name companyType')
+        .populate('suppliers.distributorId', 'name companyType')
+        .populate('suppliers.manufacturerId', 'name companyType')
+        .select('name description properties variants productTypeId manufacturerId distributorId suppliers')
         .lean();
 
       res.json({

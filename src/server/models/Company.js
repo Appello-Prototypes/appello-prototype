@@ -13,10 +13,10 @@ const companySchema = new mongoose.Schema({
     sparse: true // Allow null but enforce uniqueness when present
   },
   
-  // Company Type
+  // Company Type - Single type only: Customer, Supplier, Distributor, Subcontractor, or Other
   companyType: {
     type: String,
-    enum: ['supplier', 'subcontractor', 'client', 'vendor', 'other'],
+    enum: ['customer', 'supplier', 'distributor', 'subcontractor', 'other'],
     required: true,
     default: 'supplier'
   },
@@ -57,6 +57,28 @@ const companySchema = new mongoose.Schema({
     minimumOrder: Number,
     leadTimeDays: Number
   },
+  
+  // Distributor-Supplier Relationships (for distributors only)
+  // Tracks which suppliers (manufacturers) this distributor works with
+  distributorSuppliers: [{
+    supplierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      required: true
+    }, // The supplier (manufacturer) this distributor carries
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    addedDate: {
+      type: Date,
+      default: Date.now
+    },
+    notes: {
+      type: String,
+      trim: true
+    }
+  }],
   
   // Status
   isActive: {

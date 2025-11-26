@@ -238,6 +238,50 @@ export const jobAPI = {
   getJobCostCodes: (id) => {
     return api.get(`/api/jobs/${id}/cost-codes`)
   },
+
+  // Get approved products for job
+  getApprovedProducts: (id) => {
+    return api.get(`/api/jobs/${id}/approved-products`)
+  },
+
+  // Add approved product to job
+  addApprovedProduct: (id, productId, variantId) => {
+    return api.post(`/api/jobs/${id}/approved-products`, { productId, variantId })
+  },
+
+  // Remove approved product from job
+  removeApprovedProduct: (id, productId, variantId) => {
+    const params = variantId ? { variantId } : {}
+    return api.delete(`/api/jobs/${id}/approved-products/${productId}`, { params })
+  },
+
+  // Update spec settings
+  updateSpecSettings: (id, settings) => {
+    return api.patch(`/api/jobs/${id}/spec-settings`, settings)
+  },
+}
+
+// AI API functions
+export const aiAPI = {
+  // Chat with AI
+  chat: (message, context = {}) => {
+    return api.post('/api/ai/chat', { message, context })
+  },
+  
+  // Get job analytics
+  getJobAnalytics: (jobId) => {
+    return api.get(`/api/ai/jobs/${jobId}/analytics`)
+  },
+  
+  // Get job forecast
+  getJobForecast: (jobId, type = 'completion') => {
+    return api.get(`/api/ai/jobs/${jobId}/forecast`, { params: { type } })
+  },
+  
+  // Get available models
+  getAvailableModels: () => {
+    return api.get('/api/ai/models')
+  }
 }
 
 // User API functions
@@ -325,6 +369,49 @@ export const companyAPI = {
   getCompanyProducts: (companyId) => {
     return api.get(`/api/companies/${companyId}/products`)
   },
+
+  // Get all distributors
+  getDistributors: () => {
+    return api.get('/api/companies/distributors')
+  },
+
+  // Get all manufacturers
+  getManufacturers: () => {
+    return api.get('/api/companies/manufacturers')
+  },
+
+  // Get manufacturers for a distributor
+  getDistributorManufacturers: (distributorId) => {
+    return api.get(`/api/companies/${distributorId}/manufacturers`)
+  },
+
+  // Get distributors for a manufacturer
+  getManufacturerDistributors: (manufacturerId) => {
+    return api.get(`/api/companies/${manufacturerId}/distributors`)
+  },
+
+  // Get suppliers for a distributor
+  getDistributorSuppliers: (distributorId) => {
+    return api.get(`/api/companies/${distributorId}/distributor-suppliers`)
+  },
+
+  // Get distributors for a supplier
+  getSupplierDistributors: (supplierId) => {
+    return api.get(`/api/companies/${supplierId}/supplier-distributors`)
+  },
+
+  // Add supplier to distributor
+  addDistributorSupplier: (distributorId, supplierId, notes) => {
+    return api.post(`/api/companies/${distributorId}/distributor-suppliers`, {
+      supplierId,
+      notes
+    })
+  },
+
+  // Remove supplier from distributor
+  removeDistributorSupplier: (distributorId, supplierId) => {
+    return api.delete(`/api/companies/${distributorId}/distributor-suppliers/${supplierId}`)
+  },
 }
 
 // Product API functions
@@ -332,6 +419,16 @@ export const productAPI = {
   // Get all products
   getProducts: (params = {}) => {
     return api.get('/api/products', { params })
+  },
+
+  // Get products by distributor
+  getProductsByDistributor: (distributorId) => {
+    return api.get(`/api/products/by-distributor/${distributorId}`)
+  },
+
+  // Get products by manufacturer
+  getProductsByManufacturer: (manufacturerId) => {
+    return api.get(`/api/products/by-manufacturer/${manufacturerId}`)
   },
 
   // Get single product
@@ -438,6 +535,65 @@ export const materialRequestAPI = {
   },
 
   // Approve material request
+  approveRequest: (id, notes) => {
+    return api.post(`/api/material-requests/${id}/approve`, { approvalNotes: notes })
+  },
+
+  // Reject material request
+  rejectRequest: (id, reason) => {
+    return api.post(`/api/material-requests/${id}/reject`, { rejectionReason: reason })
+  },
+
+  // Fulfill material request
+  fulfillRequest: (id, lineItemFulfillments) => {
+    return api.post(`/api/material-requests/${id}/fulfill`, { lineItemFulfillments })
+  },
+
+  // Convert to PO (legacy - single PO)
+  convertToPO: (id, supplierId, defaultCostCode) => {
+    return api.post(`/api/material-requests/${id}/convert-to-po`, { supplierId, defaultCostCode })
+  },
+
+  // Convert to multiple POs (one per supplier)
+  convertToPOs: (id, conversions) => {
+    return api.post(`/api/material-requests/${id}/convert-to-pos`, { conversions })
+  },
+
+  // Batch generate POs from multiple material requests
+  batchGeneratePOs: (materialRequestIds) => {
+    return api.post('/api/material-requests/batch-generate-pos', { materialRequestIds })
+  },
+
+  // Get shop printout PDF
+  getShopPrintout: (id) => {
+    return api.get(`/api/material-requests/${id}/shop-printout`, { responseType: 'blob' })
+  },
+
+  // AI text-to-material request
+  createFromText: (text, jobId) => {
+    return api.post('/api/material-requests/ai-create', { text, jobId })
+  },
+  // Get all material requests
+  getMaterialRequests: (params = {}) => {
+    return api.get('/api/material-requests', { params })
+  },
+
+  // Get single material request
+  getMaterialRequest: (id) => {
+    return api.get(`/api/material-requests/${id}`)
+  },
+
+  // Create material request
+  createMaterialRequest: (data) => {
+    return api.post('/api/material-requests', data)
+  },
+
+  // Update material request
+  updateMaterialRequest: (id, data) => {
+    return api.patch(`/api/material-requests/${id}`, data)
+  },
+
+  // Approve material request
   approveRequest: (id, approvalNotes) => {
     return api.post(`/api/material-requests/${id}/approve`, { approvalNotes })
   },
@@ -453,6 +609,26 @@ export const materialRequestAPI = {
       supplierId,
       defaultCostCode
     })
+  },
+
+  // Fulfill material request
+  fulfillRequest: (id, lineItemFulfillments) => {
+    return api.post(`/api/material-requests/${id}/fulfill`, { lineItemFulfillments })
+  },
+
+  // Batch generate POs from multiple material requests
+  batchGeneratePOs: (materialRequestIds) => {
+    return api.post('/api/material-requests/batch-generate-pos', { materialRequestIds })
+  },
+
+  // Get shop printout PDF
+  getShopPrintout: (id) => {
+    return api.get(`/api/material-requests/${id}/shop-printout`, { responseType: 'blob' })
+  },
+
+  // AI text-to-material request
+  createFromText: (text, jobId) => {
+    return api.post('/api/material-requests/ai-create', { text, jobId })
   },
 }
 
@@ -548,6 +724,11 @@ export const poReceiptAPI = {
   // Approve over-receipt
   approveOverReceipt: (id) => {
     return api.post(`/api/po-receipts/${id}/approve-over-receipt`)
+  },
+
+  // Update receipt
+  updateReceipt: (id, data) => {
+    return api.put(`/api/po-receipts/${id}`, data)
   },
 }
 
@@ -741,48 +922,79 @@ export const unitOfMeasureAPI = {
 
 export const inventoryAPI = {
   // Get all inventory
-  getInventory: (params = {}) => {
+  getAllInventory: (params = {}) => {
     return api.get('/api/inventory', { params })
   },
 
+  // Get inventory by product/variant
+  getInventoryByProduct: (productId, variantId = null) => {
+    const url = variantId 
+      ? `/api/inventory/product/${productId}/${variantId}`
+      : `/api/inventory/product/${productId}`;
+    return api.get(url)
+  },
+
   // Get single inventory record
-  getInventoryRecord: (id) => {
+  getInventoryById: (id) => {
     return api.get(`/api/inventory/${id}`)
   },
 
-  // Get transactions
-  getTransactions: (params = {}) => {
-    return api.get('/api/inventory/transactions', { params })
+  // Get transactions for an inventory item
+  getInventoryTransactions: (id) => {
+    return api.get(`/api/inventory/${id}/transactions`)
   },
 
-  // Issue to job
-  issueToJob: (inventoryId, quantity, jobId, costCode) => {
-    return api.post('/api/inventory/issue-to-job', {
-      inventoryId,
-      quantity,
-      jobId,
-      costCode
-    })
+  // Create or update inventory
+  createOrUpdateInventory: (data) => {
+    return api.post('/api/inventory', data)
   },
 
-  // Return from job
-  returnFromJob: (productId, location, quantity, jobId, condition) => {
-    return api.post('/api/inventory/return-from-job', {
-      productId,
-      location,
-      quantity,
-      jobId,
-      condition
-    })
+  // Add transaction
+  addTransaction: (inventoryId, transactionData) => {
+    return api.post(`/api/inventory/${inventoryId}/transaction`, transactionData)
   },
 
-  // Adjust inventory
-  adjustInventory: (inventoryId, quantity, reason) => {
-    return api.post('/api/inventory/adjust', {
-      inventoryId,
-      quantity,
-      reason
-    })
+  // Add serialized units
+  addSerializedUnits: (inventoryId, data) => {
+    return api.post(`/api/inventory/${inventoryId}/serialized-units`, data)
+  },
+
+  // Update serialized unit
+  updateSerializedUnit: (inventoryId, serialNumber, data) => {
+    return api.put(`/api/inventory/${inventoryId}/serialized-units/${serialNumber}`, data)
+  },
+}
+
+// Location API functions
+export const locationAPI = {
+  // Get all locations
+  getLocations: (params = {}) => {
+    return api.get('/api/locations', { params })
+  },
+
+  // Get single location
+  getLocation: (id) => {
+    return api.get(`/api/locations/${id}`)
+  },
+
+  // Create location
+  createLocation: (data) => {
+    return api.post('/api/locations', data)
+  },
+
+  // Update location
+  updateLocation: (id, data) => {
+    return api.put(`/api/locations/${id}`, data)
+  },
+
+  // Delete location
+  deleteLocation: (id) => {
+    return api.delete(`/api/locations/${id}`)
+  },
+
+  // Get inventory at a location
+  getInventoryByLocation: (locationId) => {
+    return api.get(`/api/locations/${locationId}/inventory`)
   },
 }
 

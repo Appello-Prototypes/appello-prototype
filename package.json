@@ -4,6 +4,7 @@
   "description": "Task management module for Appello ICI contractor platform",
   "main": "src/index.js",
   "scripts": {
+    "seed:complex": "node scripts/seed-complex-product-data.js",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "nodemon src/server/index.js",
     "dev:client": "cd src/client && npm run dev",
@@ -20,11 +21,16 @@
     "seed:both": "node scripts/seed-both-databases.js",
     "seed:tasks": "node scripts/seed-tasks-for-three-jobs.js",
     "seed:po-material": "node scripts/seed-po-material-inventory.js",
+    "seed:inventory-po-material": "node scripts/seed-inventory-po-material-realistic.js",
+    "test:stress": "node scripts/stress-test-inventory-po-material.js",
+    "test:inventory": "node scripts/test-inventory-workflows.js",
     "db:sync": "node scripts/sync-db-schema.js prod-to-dev",
     "db:sync-data": "node scripts/sync-db-data.js",
     "db:sync-dev-to-prod": "node scripts/sync-dev-to-prod.js",
     "db:sync-dev-to-prod:dry-run": "node scripts/sync-dev-to-prod.js --dry-run",
     "db:indexes": "node scripts/create-indexes.js",
+    "fix:distributor-manufacturer": "node scripts/fix-distributor-manufacturer-relationships.js",
+    "fix:distributor-manufacturer:dry-run": "node scripts/fix-distributor-manufacturer-relationships.js --dry-run",
     "migrate:properties": "node scripts/migrate-properties-to-global-definitions.js",
     "migrate:properties:dry-run": "node scripts/migrate-properties-to-global-definitions.js --dry-run",
     "migrate:properties:verbose": "node scripts/migrate-properties-to-global-definitions.js --verbose",
@@ -47,6 +53,8 @@
     "lint:fix": "eslint src/ --fix"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "@modelcontextprotocol/sdk": "^1.22.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

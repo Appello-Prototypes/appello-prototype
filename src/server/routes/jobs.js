@@ -48,6 +48,10 @@ router.get('/', jobController.getAllJobs);
 router.get('/:id', jobController.getJobById);
 router.post('/', jobController.createJob);
 router.patch('/:id', jobController.updateJob);
+router.get('/:id/approved-products', jobController.getApprovedProducts);
+router.post('/:id/approved-products', jobController.addApprovedProduct);
+router.delete('/:id/approved-products/:productId', jobController.removeApprovedProduct);
+router.patch('/:id/spec-settings', jobController.updateSpecSettings);
 
 // Job-specific data endpoints
 router.get('/:id/schedule-of-values', jobController.getScheduleOfValues);

@@ -100,6 +100,30 @@ const jobSchema = new mongoose.Schema({
     ref: 'User'
   }],
   
+  // Approved products for this job (simple specification)
+  approvedProducts: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product'
+  }],
+  approvedProductVariants: [{
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product'
+    },
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId
+    }
+  }],
+  specEnforcementEnabled: {
+    type: Boolean,
+    default: false
+  },
+  specOverridePermission: {
+    type: String,
+    enum: ['none', 'manager', 'estimator', 'all'],
+    default: 'none'
+  },
+  
   // Job work breakdown structure
   phases: [{
     name: { type: String, required: true },

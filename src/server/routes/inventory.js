@@ -5,11 +5,13 @@ const router = express.Router();
 
 // Routes
 router.get('/', inventoryController.getAllInventory);
-router.get('/transactions', inventoryController.getTransactions);
+router.get('/product/:productId/:variantId?', inventoryController.getInventoryByProduct);
 router.get('/:id', inventoryController.getInventoryById);
-router.post('/issue-to-job', inventoryController.issueToJob);
-router.post('/return-from-job', inventoryController.returnFromJob);
-router.post('/adjust', inventoryController.adjustInventory);
+router.get('/:id/transactions', inventoryController.getInventoryTransactions);
+router.post('/', inventoryController.createOrUpdateInventory);
+router.post('/:id/transaction', inventoryController.addTransaction);
+router.post('/:id/serialized-units', inventoryController.addSerializedUnits);
+router.put('/:id/serialized-units/:serialNumber', inventoryController.updateSerializedUnit);
 
 module.exports = router;
 

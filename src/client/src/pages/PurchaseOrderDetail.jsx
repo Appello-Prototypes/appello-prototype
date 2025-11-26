@@ -1,10 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftIcon, CheckCircleIcon, XCircleIcon, PaperAirplaneIcon, XMarkIcon, DocumentArrowDownIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
-import { purchaseOrderAPI } from '../services/api'
+import { ArrowLeftIcon, CheckCircleIcon, XCircleIcon, PaperAirplaneIcon, XMarkIcon, DocumentArrowDownIcon, EnvelopeIcon, TruckIcon } from '@heroicons/react/24/outline'
+import { purchaseOrderAPI, poReceiptAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { formatCurrency } from '../utils/currency'
+import StatusBadge from '../components/StatusBadge'
+import StatusDropdown from '../components/StatusDropdown'
+import ReceiptStatusDropdown from '../components/ReceiptStatusDropdown'
 
 export default function PurchaseOrderDetail() {
   const { id } = useParams()
@@ -15,6 +19,31 @@ export default function PurchaseOrderDetail() {
     queryKey: ['purchase-order', id],
     queryFn: () => purchaseOrderAPI.getPurchaseOrder(id).then(res => res.data.data),
   })
+
+  // Fetch receipts for this PO
+  const { data: receiptsData } = useQuery({
+    queryKey: ['po-receipts', id],
+    queryFn: () => poReceiptAPI.getReceipts({ purchaseOrderId: id }).then(res => res.data.data || []),
+    enabled: !!id,
+  })
+
+  const updateStatusMutation = useMutation({
+    mutationFn: (status) => purchaseOrderAPI.updatePurchaseOrder(id, { status }),
+    onSuccess: () => {
+      toast.success('Status updated successfully')
+      queryClient.invalidateQueries(['purchase-order', id])
+      queryClient.invalidateQueries(['purchase-orders'])
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to update status')
+    },
+  })
+
+  const handleStatusChange = (newStatus) => {
+    if (newStatus !== po.status) {
+      updateStatusMutation.mutate(newStatus)
+    }
+  }
 
   const submitForApprovalMutation = useMutation({
     mutationFn: () => purchaseOrderAPI.submitForApproval(id),
@@ -156,13 +185,24 @@ export default function PurchaseOrderDetail() {
       <div className="bg-white shadow rounded-lg">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900">
                 {po.poNumber || `PO-${po._id.slice(-6)}`}
               </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Status: <span className="font-medium capitalize">{po.status.replace('_', ' ')}</span>
-              </p>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="text-sm text-gray-500">Status:</span>
+                <StatusBadge status={po.status} type="po" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-64">
+                <StatusDropdown
+                  value={po.status}
+                  onChange={handleStatusChange}
+                  type="po"
+                  disabled={updateStatusMutation.isLoading}
+                />
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {canSubmit && (
@@ -242,140 +282,346 @@ export default function PurchaseOrderDetail() {
 
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-4">PO Details</h2>
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Supplier</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {po.supplierId?.name || 'N/A'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Job</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {po.jobId?.jobNumber || po.jobId?.name || 'N/A'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Required By</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {po.requiredByDate ? format(new Date(po.requiredByDate), 'MMM dd, yyyy') : 'N/A'}
-                  </dd>
-                </div>
-                {po.costCode && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Cost Code</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{po.costCode}</dd>
-                  </div>
-                )}
-                {po.shipToAddress && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Ship To</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {typeof po.shipToAddress === 'string' 
-                        ? po.shipToAddress 
-                        : [
-                            po.shipToAddress.street,
-                            po.shipToAddress.city,
-                            po.shipToAddress.province,
-                            po.shipToAddress.postalCode,
-                            po.shipToAddress.country
-                          ].filter(Boolean).join(', ')}
-                    </dd>
-                  </div>
-                )}
-                {po.deliveryInstructions && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Delivery Instructions</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{po.deliveryInstructions}</dd>
-                  </div>
-                )}
-                {po.rejectionReason && (
-                  <div>
-                    <dt className="text-sm font-medium text-red-500">Rejection Reason</dt>
-                    <dd className="mt-1 text-sm text-red-900">{po.rejectionReason}</dd>
-                  </div>
-                )}
-              </dl>
+            <div className="md:col-span-2">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">PO Information</h2>
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Supplier
+              </label>
+              <div className="mt-1 text-sm text-gray-900">
+                {po.supplierId?.name || 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Job
+              </label>
+              <div className="mt-1 text-sm text-gray-900">
+                {po.jobId?.jobNumber || po.jobId?.name || 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Default Cost Code
+              </label>
+              <div className="mt-1 text-sm text-gray-900">
+                {po.defaultCostCode || po.costCode || '-'}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Required By Date
+              </label>
+              <div className="mt-1 text-sm text-gray-900">
+                {po.requiredByDate ? format(new Date(po.requiredByDate), 'MMM dd, yyyy') : 'N/A'}
+              </div>
+            </div>
+
+            {po.shipToAddress && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Ship To Address
+                </label>
+                <div className="mt-1 text-sm text-gray-900">
+                  {typeof po.shipToAddress === 'string' 
+                    ? po.shipToAddress 
+                    : [
+                        po.shipToAddress.street,
+                        po.shipToAddress.city,
+                        po.shipToAddress.province,
+                        po.shipToAddress.postalCode,
+                        po.shipToAddress.country
+                      ].filter(Boolean).join(', ')}
+                </div>
+              </div>
+            )}
+
+            {po.deliveryInstructions && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Delivery Instructions
+                </label>
+                <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                  {po.deliveryInstructions}
+                </div>
+              </div>
+            )}
+
+            {po.internalNotes && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Internal Notes
+                </label>
+                <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                  {po.internalNotes}
+                </div>
+              </div>
+            )}
+
+            {po.supplierNotes && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Supplier Notes (printed on PO)
+                </label>
+                <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                  {po.supplierNotes}
+                </div>
+              </div>
+            )}
+
+            {po.rejectionReason && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-red-700">
+                  Rejection Reason
+                </label>
+                <div className="mt-1 text-sm text-red-900">
+                  {po.rejectionReason}
+                </div>
+              </div>
+            )}
+
+            {/* Line Items */}
+            <div className="md:col-span-2 mt-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Line Items</h2>
-              <div className="space-y-3">
-                {po.lineItems && po.lineItems.length > 0 ? (
-                  <>
-                    {po.lineItems.map((item, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">{item.description}</p>
-                            <p className="text-sm text-gray-500 mt-1">
-                              {item.quantity} {item.unit} @ ${item.unitPrice?.toFixed(2)}
-                            </p>
-                            {item.costCode && (
-                              <p className="text-sm text-gray-500">Cost Code: {item.costCode}</p>
-                            )}
-                            {item.receivedQuantity !== undefined && (
-                              <p className="text-sm text-gray-500">
-                                Received: {item.receivedQuantity} {item.unit}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-gray-900">
-                              ${item.extendedCost?.toFixed(2) || '0.00'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="border-t pt-3 mt-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Subtotal:</span>
-                        <span className="font-medium">${po.subtotal?.toFixed(2) || '0.00'}</span>
-                      </div>
+              {po.lineItems && po.lineItems.length > 0 ? (
+                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          Product / Description
+                        </th>
+                        <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">
+                          Qty
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">
+                          Unit
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider w-40">
+                          Unit Price
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">
+                          Extended
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">
+                          Cost Code
+                        </th>
+                        {(po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0)) && (
+                          <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">
+                            Received
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {po.lineItems.map((item, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="space-y-1.5 min-w-[300px]">
+                              <div className="text-sm font-medium text-gray-900">
+                                {item.variantName ? `${item.productName || item.description} - ${item.variantName}` : (item.productName || item.description || 'N/A')}
+                              </div>
+                              {item.sku && (
+                                <div className="text-xs text-gray-500">SKU: {item.sku}</div>
+                              )}
+                              {item.description && item.description !== item.productName && (
+                                <div className="text-xs text-gray-500">{item.description}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-right text-sm text-gray-900">
+                            {item.quantity || item.quantityOrdered || 0}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-center text-sm text-gray-600">
+                            {item.unit || 'EA'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900">
+                            {formatCurrency(item.unitPrice || 0)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                            {formatCurrency(item.extendedCost || 0)}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-center text-xs text-gray-600">
+                            {item.costCode || '-'}
+                          </td>
+                          {(po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0)) && (
+                            <td className="px-3 py-3 whitespace-nowrap text-right text-sm text-gray-600">
+                              {item.quantityReceived !== undefined ? `${item.quantityReceived} ${item.unit || 'EA'}` : '-'}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50">
+                      <tr>
+                        <td colSpan={po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) ? 6 : 5} className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                          Subtotal:
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                          {formatCurrency(po.subtotal || 0)}
+                        </td>
+                        {po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) && <td></td>}
+                      </tr>
                       {po.taxAmount > 0 && (
-                        <div className="flex justify-between text-sm mt-1">
-                          <span className="text-gray-500">Tax:</span>
-                          <span className="font-medium">${po.taxAmount.toFixed(2)}</span>
-                        </div>
+                        <tr>
+                          <td colSpan={po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) ? 6 : 5} className="px-4 py-3 text-right text-sm text-gray-700">
+                            Tax:
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm text-gray-900">
+                            {formatCurrency(po.taxAmount)}
+                          </td>
+                          {po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) && <td></td>}
+                        </tr>
                       )}
                       {po.freightAmount > 0 && (
-                        <div className="flex justify-between text-sm mt-1">
-                          <span className="text-gray-500">Freight:</span>
-                          <span className="font-medium">${po.freightAmount.toFixed(2)}</span>
-                        </div>
+                        <tr>
+                          <td colSpan={po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) ? 6 : 5} className="px-4 py-3 text-right text-sm text-gray-700">
+                            Freight:
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm text-gray-900">
+                            {formatCurrency(po.freightAmount)}
+                          </td>
+                          {po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) && <td></td>}
+                        </tr>
                       )}
-                      <div className="flex justify-between text-base font-bold mt-2 pt-2 border-t">
-                        <span>Total:</span>
-                        <span>${po.totalAmount?.toFixed(2) || '0.00'}</span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
+                      <tr>
+                        <td colSpan={po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) ? 6 : 5} className="px-4 py-3 text-right text-base font-bold text-gray-900">
+                          Total:
+                        </td>
+                        <td className="px-4 py-3 text-right text-base font-bold text-gray-900">
+                          {formatCurrency(po.total || po.totalAmount || 0)}
+                        </td>
+                        {po.lineItems.some(item => item.quantityReceived !== undefined && item.quantityReceived > 0) && <td></td>}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <p className="text-gray-500">No line items</p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {po.supplierNotes && (
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Supplier Notes</h3>
-              <p className="text-sm text-gray-600">{po.supplierNotes}</p>
+          {/* Receipts Section */}
+          <div className="mt-8 pt-8 border-t">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                <TruckIcon className="h-5 w-5" />
+                Receipts ({receiptsData?.length || 0})
+              </h2>
+              <Link
+                to={`/receiving?poId=${id}`}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                Create Receipt
+              </Link>
             </div>
-          )}
-
-          {po.internalNotes && (
-            <div className="mt-4">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Internal Notes</h3>
-              <p className="text-sm text-gray-600">{po.internalNotes}</p>
-            </div>
-          )}
+            
+            {receiptsData && receiptsData.length > 0 ? (
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Receipt #
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date Received
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Received By
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Delivery Date
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Value
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {receiptsData
+                      .sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt))
+                      .map((receipt) => (
+                        <tr key={receipt._id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <Link
+                              to={`/receiving?receiptId=${receipt._id}`}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                            >
+                              {receipt.receiptNumber || `REC-${receipt._id.slice(-6)}`}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                            {receipt.receivedAt ? format(new Date(receipt.receivedAt), 'MMM dd, yyyy HH:mm') : '-'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                            {receipt.receivedBy?.name || '-'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                            {receipt.deliveryDate ? format(new Date(receipt.deliveryDate), 'MMM dd, yyyy') : '-'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                            {receipt.locationPlaced || '-'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                            ${(receipt.totalReceived || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <ReceiptStatusDropdown
+                              value={receipt.status || 'draft'}
+                              onChange={(newStatus) => {
+                                // TODO: Add mutation handler if needed
+                                console.log('Update receipt status:', receipt._id, newStatus)
+                              }}
+                            />
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm">
+                            <Link
+                              to={`/receiving?receiptId=${receipt._id}`}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              View
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <TruckIcon className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                <p>No receipts yet</p>
+                <Link
+                  to={`/receiving?poId=${id}`}
+                  className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Create first receipt
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
+
 

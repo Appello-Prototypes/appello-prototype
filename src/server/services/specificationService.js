@@ -236,9 +236,9 @@ class SpecificationService {
     
     if (bestSpec.preferredSupplierId && !bestSpec.allowOtherSuppliers) {
       productQuery.$or = [
-        { supplierId: bestSpec.preferredSupplierId },
-        { 'suppliers.supplierId': bestSpec.preferredSupplierId },
-        { 'variants.suppliers.supplierId': bestSpec.preferredSupplierId }
+        { manufacturerId: bestSpec.preferredSupplierId },
+        { 'suppliers.manufacturerId': bestSpec.preferredSupplierId },
+        { 'variants.suppliers.manufacturerId': bestSpec.preferredSupplierId }
       ];
     }
     

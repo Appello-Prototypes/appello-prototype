@@ -31,6 +31,8 @@ export default function ProductSelectionModal({
   });
 
   // Search products with filters
+  // For Material Requests (no supplierId), search all products
+  // For Purchase Orders (with supplierId), filter by supplier
   const { data: searchResults, isLoading: isLoadingSearch } = useQuery({
     queryKey: ['product-search-enhanced', searchTerm, supplierId, filters, productTypeId],
     queryFn: () => {
@@ -39,9 +41,9 @@ export default function ProductSelectionModal({
       if (Object.keys(filters).length > 0) {
         params.filters = JSON.stringify(filters);
       }
-      return productAPI.searchProducts(searchTerm || '', supplierId, params).then(res => res.data.data);
+      return productAPI.searchProducts(searchTerm || '', supplierId || null, params).then(res => res.data.data);
     },
-    enabled: isOpen && !!supplierId && activeTab === 'search',
+    enabled: isOpen && activeTab === 'search',
     staleTime: 30000
   });
 
@@ -156,16 +158,14 @@ export default function ProductSelectionModal({
           <div className="flex-1 overflow-hidden flex">
             {activeTab === 'search' && (
               <>
-                {/* Filter Sidebar - Always show when supplier is selected */}
-                {supplierId && (
-                  <PropertyFilterSidebar
-                    productTypeId={productTypeId}
-                    filters={filters}
-                    onFiltersChange={handleFiltersChange}
-                    onClearFilters={handleClearFilters}
-                    supplierId={supplierId}
-                  />
-                )}
+                {/* Filter Sidebar - Show when supplier is selected (for POs) or always (for Material Requests) */}
+                <PropertyFilterSidebar
+                  productTypeId={productTypeId}
+                  filters={filters}
+                  onFiltersChange={handleFiltersChange}
+                  onClearFilters={handleClearFilters}
+                  supplierId={supplierId}
+                />
 
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col overflow-hidden">

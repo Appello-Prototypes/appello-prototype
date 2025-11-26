@@ -8,7 +8,9 @@ export default function PropertyFilterSidebar({
   filters, 
   onFiltersChange,
   onClearFilters,
-  supplierId // Add supplierId to fetch products for value extraction
+  supplierId, // Legacy - kept for backward compatibility
+  manufacturerId,
+  distributorId
 }) {
   const [localFilters, setLocalFilters] = useState(filters || {});
   const [expandedCategories, setExpandedCategories] = useState(new Set(['dimension', 'material', 'specification']));
@@ -28,13 +30,17 @@ export default function PropertyFilterSidebar({
 
   // Fetch products to extract unique property values
   const { data: productsForValues } = useQuery({
-    queryKey: ['products-for-property-values', supplierId, productTypeId],
+    queryKey: ['products-for-property-values', supplierId, productTypeId, manufacturerId, distributorId],
     queryFn: () => {
       const params = { limit: 500 }; // Get more products to extract values
       if (productTypeId) params.productTypeId = productTypeId;
-      return productAPI.searchProducts('', supplierId, params).then(res => res.data.data);
+      if (manufacturerId) params.manufacturerId = manufacturerId;
+      if (distributorId) params.distributorId = distributorId;
+      // Legacy support - use supplierId if provided (maps to manufacturerId)
+      if (supplierId && !manufacturerId) params.manufacturerId = supplierId;
+      return productAPI.searchProducts('', null, params).then(res => res.data.data);
     },
-    enabled: !!supplierId, // Only fetch when supplier is selected
+    enabled: true, // Enable for both POs (with supplier) and Material Requests (without supplier)
     staleTime: 60000 // Cache for 1 minute
   });
 
@@ -314,9 +320,7 @@ export default function PropertyFilterSidebar({
 
       {relevantProperties.length === 0 ? (
         <div className="text-sm text-gray-500">
-          {!supplierId 
-            ? 'Select a supplier to enable property filters'
-            : 'No property definitions available'}
+          {'No property definitions available'}
         </div>
       ) : (
         <div className="space-y-3">

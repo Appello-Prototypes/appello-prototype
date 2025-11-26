@@ -6,6 +6,8 @@ const router = express.Router();
 // Routes
 router.get('/', productController.getAllProducts);
 router.get('/by-pricebook', productController.getProductsByPricebook);
+router.get('/by-distributor/:distributorId', productController.getProductsByDistributor);
+router.get('/by-manufacturer/:manufacturerId', productController.getProductsByManufacturer);
 router.get('/search/autocomplete', productController.searchProducts);
 router.get('/:id', productController.getProductById);
 router.get('/:id/suppliers', productController.getProductSuppliers);

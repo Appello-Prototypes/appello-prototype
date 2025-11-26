@@ -39,24 +39,39 @@ const productVariantSchema = new mongoose.Schema({
     discountPercent: Number, // Discount percentage (0-100)
     discountAmount: Number // Discount amount (calculated or fixed)
   },
-  // Variant-specific suppliers
+  // Variant-specific suppliers (distributor-manufacturer combinations with pricing)
+  // DISTRIBUTORS SET THE PRICE - same product can have different prices from different distributors
   suppliers: [{
-    supplierId: {
+    distributorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Company',
       required: true
-    },
+    }, // The distributor (who we buy from) - DISTRIBUTORS SET THE PRICE
+    manufacturerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      required: true
+    }, // The supplier/manufacturer who makes this variant
     supplierPartNumber: String,
     lastPrice: Number, // Legacy field - use listPrice instead
-    listPrice: Number, // List price from supplier
-    netPrice: Number, // Net price after discount
-    discountPercent: Number, // Discount percentage for this supplier
+    listPrice: Number, // List price from distributor (DISTRIBUTOR SETS THIS)
+    netPrice: Number, // Net price after discount (DISTRIBUTOR SETS THIS)
+    discountPercent: Number, // Discount percentage for this distributor
     lastPurchasedDate: Date,
     isPreferred: {
       type: Boolean,
       default: false
     }
   }],
+  // Package quantity (e.g., "126 feet in box" for pipe covering)
+  packageQuantity: {
+    type: Number,
+    min: 0
+  },
+  packageUnit: {
+    type: String,
+    trim: true
+  },
   // Status
   isActive: {
     type: Boolean,
@@ -65,11 +80,16 @@ const productVariantSchema = new mongoose.Schema({
 }, { _id: true });
 
 const supplierInfoSchema = new mongoose.Schema({
-  supplierId: {
+  distributorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
     required: true
-  },
+  }, // The distributor (who we buy from) - DISTRIBUTORS SET THE PRICE
+  manufacturerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true
+  }, // The supplier/manufacturer who makes the product
   supplierPartNumber: {
     type: String,
     trim: true
@@ -82,16 +102,16 @@ const supplierInfoSchema = new mongoose.Schema({
   listPrice: {
     type: Number,
     min: 0
-  }, // List price from supplier
+  }, // List price from distributor (DISTRIBUTOR SETS THIS)
   netPrice: {
     type: Number,
     min: 0
-  }, // Net price after discount
+  }, // Net price after discount (DISTRIBUTOR SETS THIS)
   discountPercent: {
     type: Number,
     min: 0,
     max: 100
-  }, // Discount percentage for this supplier
+  }, // Discount percentage for this distributor
   lastPurchasedDate: {
     type: Date
   },
@@ -157,15 +177,15 @@ const productSchema = new mongoose.Schema({
     default: []
   },
   
-  // Legacy fields (deprecated, kept for backward compatibility)
-  supplierId: {
+  // Manufacturer/Distributor (primary - for quick access)
+  manufacturerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company'
-  },
-  supplierCatalogNumber: {
-    type: String,
-    trim: true
-  },
+  }, // Primary manufacturer who makes this product
+  distributorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company'
+  }, // Primary distributor who supplies this product to us
   
   // Pricing (deprecated, use suppliers[].lastPrice)
   lastPrice: {
@@ -270,6 +290,34 @@ const productSchema = new mongoose.Schema({
     }]
   }],
   
+  // Inventory Tracking Configuration
+  inventoryTracking: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    // Type: 'bulk' for quantity-based tracking, 'serialized' for individual unit tracking
+    type: {
+      type: String,
+      enum: ['bulk', 'serialized'],
+      default: 'bulk'
+    },
+    // For bulk items: reorder point and quantity
+    reorderPoint: {
+      type: Number,
+      min: 0
+    },
+    reorderQuantity: {
+      type: Number,
+      min: 0
+    },
+    // Default location for this product
+    defaultLocation: {
+      type: String,
+      trim: true
+    }
+  },
+  
   // Status
   isActive: {
     type: Boolean,
@@ -296,20 +344,11 @@ const productSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Pre-save hook to migrate legacy supplierId to suppliers array and normalize properties
+// Pre-save hook to normalize properties
 productSchema.pre('save', async function(next) {
-  // If suppliers array is empty but supplierId exists, migrate it
-  if ((!this.suppliers || this.suppliers.length === 0) && this.supplierId) {
-    this.suppliers = [{
-      supplierId: this.supplierId,
-      supplierPartNumber: this.supplierCatalogNumber || '',
-      lastPrice: this.lastPrice || 0,
-      lastPurchasedDate: this.lastPurchasedDate
-    }];
-  }
-  // Ensure at least one supplier exists (either in suppliers array or supplierId)
-  if ((!this.suppliers || this.suppliers.length === 0) && !this.supplierId) {
-    return next(new Error('Product must have at least one supplier'));
+  // Ensure at least one supplier exists in suppliers array
+  if (!this.suppliers || this.suppliers.length === 0) {
+    return next(new Error('Product must have at least one supplier in suppliers array'));
   }
   
   // Normalize product properties
@@ -374,11 +413,13 @@ productSchema.pre('save', async function(next) {
 
 // Indexes
 productSchema.index({ name: 'text', description: 'text' }); // Text search
-productSchema.index({ supplierId: 1 }); // Legacy index
-productSchema.index({ 'suppliers.supplierId': 1 }); // New index for supplier lookup
+productSchema.index({ manufacturerId: 1 }); // Manufacturer lookup
+productSchema.index({ distributorId: 1 }); // Distributor lookup
+productSchema.index({ 'suppliers.manufacturerId': 1 }); // Variant manufacturer lookup
+productSchema.index({ 'suppliers.distributorId': 1 }); // Variant distributor lookup
 productSchema.index({ category: 1 });
 productSchema.index({ isActive: 1 });
-productSchema.index({ name: 1, supplierId: 1 }); // Legacy compound index
+productSchema.index({ manufacturerId: 1, distributorId: 1 }); // Compound index for manufacturer/distributor queries
 productSchema.index({ internalPartNumber: 1 }); // Internal part number lookup
 productSchema.index({ productTypeId: 1 }); // Product type lookup
 productSchema.index({ 'variants.sku': 1 }); // Variant SKU lookup

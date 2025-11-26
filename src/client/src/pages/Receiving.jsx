@@ -1,11 +1,18 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CameraIcon, CheckCircleIcon, PhotoIcon } from '@heroicons/react/24/outline'
+import { useSearchParams } from 'react-router-dom'
+import { CameraIcon, CheckCircleIcon, PhotoIcon, DocumentTextIcon, ListBulletIcon } from '@heroicons/react/24/outline'
 import { poReceiptAPI, jobAPI, purchaseOrderAPI, uploadAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import ReceiptsList from '../components/receiving/ReceiptsList'
+import ReceiptDetailView from '../components/receiving/ReceiptDetailView'
 
 export default function Receiving() {
+  const [searchParams] = useSearchParams()
+  const receiptIdFromUrl = searchParams.get('receiptId')
+  const [viewMode, setViewMode] = useState(receiptIdFromUrl ? 'detail' : 'list') // 'list', 'create', 'detail'
+  const [selectedReceiptId, setSelectedReceiptId] = useState(receiptIdFromUrl || null)
   const [selectedJobId, setSelectedJobId] = useState('')
   const [selectedPOId, setSelectedPOId] = useState('')
   const [receiptData, setReceiptData] = useState({
@@ -33,11 +40,12 @@ export default function Receiving() {
 
   const mutation = useMutation({
     mutationFn: (data) => poReceiptAPI.createReceipt(data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success('Receipt created successfully')
       queryClient.invalidateQueries(['po-receipts'])
       queryClient.invalidateQueries(['purchase-orders'])
-      // Reset form
+      queryClient.invalidateQueries(['inventory'])
+      // Reset form and switch to list view
       setSelectedJobId('')
       setSelectedPOId('')
       setReceiptData({
@@ -47,6 +55,13 @@ export default function Receiving() {
         billOfLadingPhoto: null,
         materialPhotos: [],
       })
+      // Optionally show the newly created receipt
+      if (data?.data?._id) {
+        setSelectedReceiptId(data.data._id)
+        setViewMode('detail')
+      } else {
+        setViewMode('list')
+      }
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to create receipt')
@@ -144,11 +159,73 @@ export default function Receiving() {
     }
   }
 
+  // Handle receipt selection
+  const handleSelectReceipt = (receipt) => {
+    setSelectedReceiptId(receipt._id)
+    setViewMode('detail')
+  }
+
+  const handleBackToList = () => {
+    setViewMode('list')
+    setSelectedReceiptId(null)
+    // Clear URL param
+    window.history.replaceState({}, '', '/receiving')
+  }
+
+  const handleCreateNew = () => {
+    setViewMode('create')
+    setSelectedReceiptId(null)
+  }
+
+  // If viewing a specific receipt from URL
+  if (viewMode === 'detail' && selectedReceiptId) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Material Receiving</h1>
+          <p className="mt-1 text-sm text-gray-500">View receipt details</p>
+        </div>
+        <ReceiptDetailView 
+          receiptId={selectedReceiptId}
+          onBack={handleBackToList}
+        />
+      </div>
+    )
+  }
+
+  // If viewing list
+  if (viewMode === 'list') {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Material Receiving</h1>
+          <p className="mt-1 text-sm text-gray-500">View and manage all material receipts</p>
+        </div>
+        <ReceiptsList 
+          onSelectReceipt={handleSelectReceipt}
+          onCreateNew={handleCreateNew}
+        />
+      </div>
+    )
+  }
+
+  // Create view (existing form)
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Material Receiving</h1>
-        <p className="mt-1 text-sm text-gray-500">Record material receipts against purchase orders</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Material Receiving</h1>
+            <p className="mt-1 text-sm text-gray-500">Record material receipts against purchase orders</p>
+          </div>
+          <button
+            onClick={() => setViewMode('list')}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            <ListBulletIcon className="h-5 w-5 mr-2" />
+            View All Receipts
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg">

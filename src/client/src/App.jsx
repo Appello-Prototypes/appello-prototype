@@ -32,6 +32,9 @@ import CompanyList from './pages/CompanyList'
 import CompanyForm from './pages/CompanyForm'
 import CompanyOverview from './pages/CompanyOverview'
 import CompanyProducts from './pages/CompanyProducts'
+import DistributorManufacturers from './pages/DistributorManufacturers'
+import ManufacturerDistributors from './pages/ManufacturerDistributors'
+import SupplierPriceComparison from './pages/SupplierPriceComparison'
 import CompanyLayout from './components/CompanyLayout'
 import ProductList from './pages/ProductList'
 import ProductForm from './pages/ProductForm'
@@ -52,9 +55,12 @@ import SpecificationList from './pages/SpecificationList'
 import SpecificationForm from './pages/SpecificationForm'
 import PropertyDefinitionList from './pages/PropertyDefinitionList'
 import PropertyDefinitionForm from './pages/PropertyDefinitionForm'
+import Inventory from './pages/Inventory'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import AITestingDashboard from './pages/AITestingDashboard'
+import AISettings from './pages/AISettings'
 
 function App() {
   return (
@@ -101,6 +107,9 @@ function App() {
         <Route path="/companies/:id" element={<CompanyLayout />}>
           <Route index element={<CompanyOverview />} />
           <Route path="products" element={<CompanyProducts />} />
+          <Route path="manufacturers" element={<DistributorManufacturers />} />
+          <Route path="distributors" element={<ManufacturerDistributors />} />
+          <Route path="price-comparison" element={<SupplierPriceComparison />} />
         </Route>
         <Route path="/products" element={<ProductList />} />
         <Route path="/products/create" element={<ProductForm />} />
@@ -122,7 +131,10 @@ function App() {
         <Route path="/receiving" element={<Receiving />} />
         <Route path="/discounts" element={<DiscountManagement />} />
         <Route path="/pricebook" element={<PricebookView />} />
+        <Route path="/inventory" element={<Inventory />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/ai-testing" element={<AITestingDashboard />} />
+        <Route path="/ai-settings" element={<AISettings />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>

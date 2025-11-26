@@ -528,12 +528,21 @@ const purchaseOrderController = {
         });
       }
 
+      // Fetch products for package quantities
+      const productIds = purchaseOrder.lineItems
+        .map(item => item.productId)
+        .filter(Boolean);
+      const products = productIds.length > 0
+        ? await Product.find({ _id: { $in: productIds } }).lean()
+        : [];
+
       // Generate PDF
       const pdfBuffer = await generatePOPDF(
         purchaseOrder,
         purchaseOrder.supplierId,
         purchaseOrder.jobId,
-        purchaseOrder.buyerId
+        purchaseOrder.buyerId,
+        products
       );
 
       // Set response headers
@@ -606,11 +615,20 @@ const purchaseOrderController = {
           emailMethod = 'gmail';
           
           // Generate PDF
+          // Fetch products for package quantities
+          const productIds = purchaseOrder.lineItems
+            .map(item => item.productId)
+            .filter(Boolean);
+          const products = productIds.length > 0
+            ? await Product.find({ _id: { $in: productIds } }).lean()
+            : [];
+
           const pdfBuffer = await generatePOPDF(
             purchaseOrder,
             purchaseOrder.supplierId,
             purchaseOrder.jobId,
-            purchaseOrder.buyerId
+            purchaseOrder.buyerId,
+            products
           );
 
           emailResult = await sendPOEmailViaGmail({

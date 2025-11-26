@@ -21,8 +21,12 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   CurrencyDollarIcon,
+  ArchiveBoxIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline'
 import { versionAPI } from '../services/api'
+import ProductCatalogPanel from './ProductCatalogPanel'
+import AIAssistant from './AIAssistant'
 
 // Navigation structure with sub-menus
 const navigation = [
@@ -53,9 +57,18 @@ const navigation = [
     ]
   },
   {
+    name: 'AI Intelligence',
+    icon: CpuChipIcon,
+    items: [
+      { name: 'AI Testing Dashboard', href: '/ai-testing', icon: CpuChipIcon },
+      { name: 'AI Settings', href: '/ai-settings', icon: Cog6ToothIcon },
+    ]
+  },
+  {
     name: 'Materials & Inventory',
     icon: CubeIcon,
     items: [
+      { name: 'Inventory', href: '/inventory', icon: ArchiveBoxIcon },
       { name: 'Material Requests', href: '/material-requests', icon: ClipboardDocumentCheckIcon },
       { name: 'Purchase Orders', href: '/purchase-orders', icon: DocumentTextIcon },
       { name: 'Receiving', href: '/receiving', icon: TruckIcon },
@@ -78,6 +91,7 @@ const navigation = [
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState({})
+  const [productCatalogOpen, setProductCatalogOpen] = useState(false)
   const [versionInfo, setVersionInfo] = useState({
     version: '1.1.0',
     environment: typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? 'production' : 'development'
@@ -368,6 +382,16 @@ export default function Layout({ children }) {
               </button>
               
               <div className="flex items-center space-x-3">
+                {/* Product Catalog Button */}
+                <button
+                  onClick={() => setProductCatalogOpen(true)}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                  title="Product Catalog"
+                >
+                  <CubeIcon className="h-5 w-5 mr-1.5" />
+                  <span className="hidden sm:inline">Product Catalog</span>
+                </button>
+                
                 <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
                   <span className="text-sm font-medium text-gray-700">
                     {user?.name?.charAt(0)?.toUpperCase() || 'U'}
@@ -410,6 +434,15 @@ export default function Layout({ children }) {
           </div>
         </main>
       </div>
+
+      {/* Product Catalog Panel */}
+      <ProductCatalogPanel 
+        isOpen={productCatalogOpen} 
+        onClose={() => setProductCatalogOpen(false)} 
+      />
+      
+      {/* AI Assistant - Available globally */}
+      <AIAssistant />
     </div>
   )
 }

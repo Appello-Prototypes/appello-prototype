@@ -61,9 +61,16 @@ const materialRequestSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product'
     },
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId
+    },
     productName: {
       type: String,
       required: true,
+      trim: true
+    },
+    variantName: {
+      type: String,
       trim: true
     },
     description: {
@@ -84,6 +91,25 @@ const materialRequestSchema = new mongoose.Schema({
     notes: {
       type: String,
       trim: true
+    },
+    // Fulfillment information
+    fulfillmentSource: {
+      type: String,
+      enum: ['inventory', 'supplier'],
+      trim: true
+    },
+    supplierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company'
+    },
+    inventoryLocation: {
+      type: String,
+      trim: true
+    },
+    costCode: {
+      type: String,
+      trim: true,
+      uppercase: true
     }
   }],
   

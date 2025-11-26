@@ -5,27 +5,54 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   CubeIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  BuildingOfficeIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
-import { api } from '../services/api'
+import { api, companyAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
 const PricebookView = () => {
   const [pricebookData, setPricebookData] = useState([])
+  const [distributors, setDistributors] = useState([])
+  const [selectedDistributorId, setSelectedDistributorId] = useState('')
+  const [selectedDistributor, setSelectedDistributor] = useState(null)
   const [loading, setLoading] = useState(true)
   const [expandedSections, setExpandedSections] = useState({})
   const [expandedPages, setExpandedPages] = useState({})
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    fetchPricebookData()
+    fetchDistributors()
   }, [])
+
+  useEffect(() => {
+    fetchPricebookData()
+  }, [selectedDistributorId])
+
+  const fetchDistributors = async () => {
+    try {
+      const response = await companyAPI.getDistributors()
+      setDistributors(response.data.data || [])
+    } catch (error) {
+      console.error('Error fetching distributors:', error)
+    }
+  }
 
   const fetchPricebookData = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/api/products/by-pricebook')
+      const params = selectedDistributorId ? { distributorId: selectedDistributorId } : {}
+      const response = await api.get('/api/products/by-pricebook', { params })
       setPricebookData(response.data.data || [])
+      
+      // Set selected distributor info
+      if (selectedDistributorId) {
+        const dist = distributors.find(d => d._id === selectedDistributorId)
+        setSelectedDistributor(dist || null)
+      } else {
+        setSelectedDistributor(null)
+      }
       
       // Auto-expand first section
       if (response.data.data && response.data.data.length > 0) {
@@ -85,10 +112,54 @@ const PricebookView = () => {
               Pricebook View
             </h1>
             <p className="mt-2 text-sm text-gray-600">
-              Browse products organized by pricebook sections and pages
+              {selectedDistributor 
+                ? `Viewing ${selectedDistributor.name}'s price sheet - products organized by pricebook sections and pages`
+                : 'Browse products organized by pricebook sections and pages - select a distributor to view their price sheet'
+              }
             </p>
           </div>
         </div>
+
+        {/* Distributor Selector */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <BuildingOfficeIcon className="h-4 w-4 inline mr-1" />
+            View Price Sheet For:
+          </label>
+          <select
+            value={selectedDistributorId}
+            onChange={(e) => {
+              setSelectedDistributorId(e.target.value)
+              setExpandedSections({})
+              setExpandedPages({})
+            }}
+            className="w-full md:w-80 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+          >
+            <option value="">All Distributors (Show All Products)</option>
+            {distributors.map(dist => (
+              <option key={dist._id} value={dist._id}>
+                {dist.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Selected Distributor Info */}
+        {selectedDistributor && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <BuildingOfficeIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <div>
+                <span className="text-sm font-medium text-blue-900">
+                  Viewing price sheet for: {selectedDistributor.name}
+                </span>
+                <p className="text-xs text-blue-700 mt-1">
+                  Prices shown are specific to this distributor
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="mt-4">
@@ -194,28 +265,99 @@ const PricebookView = () => {
                                     to={`/products/${product._id}`}
                                     className="block p-3 rounded-lg hover:bg-gray-50 border border-gray-200 hover:border-blue-300 transition-colors"
                                   >
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-start justify-between">
                                       <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                          <CubeIcon className="h-4 w-4 text-gray-400" />
+                                          <CubeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                                           <span className="font-medium text-gray-900">
                                             {product.name}
                                           </span>
+                                          {product.hasMultipleDistributors && !selectedDistributorId && (
+                                            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded">
+                                              Multiple Distributors
+                                            </span>
+                                          )}
                                         </div>
                                         {product.description && (
                                           <p className="text-sm text-gray-500 mt-1">
                                             {product.description}
                                           </p>
                                         )}
-                                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                                          <span>{product.variantCount} variants</span>
+                                        <div className="flex items-center gap-4 mt-2 flex-wrap">
+                                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <span>{product.variantCount} variants</span>
+                                            {product.manufacturerName && (
+                                              <>
+                                                <span className="text-gray-300">•</span>
+                                                <span className="flex items-center gap-1">
+                                                  <BuildingOfficeIcon className="h-3 w-3" />
+                                                  {product.manufacturerName}
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
                                           {product.category && (
-                                            <span className="px-2 py-0.5 bg-gray-100 rounded">
+                                            <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
                                               {product.category}
                                             </span>
                                           )}
                                         </div>
+                                        
+                                        {/* Show available distributors if no distributor selected */}
+                                        {!selectedDistributorId && product.availableFromDistributors && product.availableFromDistributors.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t border-gray-200">
+                                            <div className="text-xs text-gray-600 font-medium mb-1">Available from:</div>
+                                            <div className="flex flex-wrap gap-2">
+                                              {product.availableFromDistributors.map((dist, idx) => (
+                                                <span key={idx} className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">
+                                                  {dist.distributorName}
+                                                  {dist.netPrice && (
+                                                    <span className="ml-1 font-semibold">
+                                                      ${dist.netPrice.toFixed(2)}
+                                                    </span>
+                                                  )}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
+                                      
+                                      {/* Distributor-specific pricing */}
+                                      {selectedDistributorId && product.distributorPricing && (
+                                        <div className="ml-4 flex-shrink-0 text-right">
+                                          <div className="flex items-center gap-1 text-gray-600">
+                                            <CurrencyDollarIcon className="h-4 w-4" />
+                                            <div>
+                                              {product.distributorPricing.netPrice ? (
+                                                <>
+                                                  <div className="text-lg font-semibold text-gray-900">
+                                                    ${product.distributorPricing.netPrice.toFixed(2)}
+                                                  </div>
+                                                  {product.distributorPricing.listPrice && 
+                                                   product.distributorPricing.listPrice > product.distributorPricing.netPrice && (
+                                                    <div className="text-xs text-gray-400 line-through">
+                                                      ${product.distributorPricing.listPrice.toFixed(2)}
+                                                    </div>
+                                                  )}
+                                                  {product.distributorPricing.discountPercent > 0 && (
+                                                    <div className="text-xs text-green-600 font-medium">
+                                                      {product.distributorPricing.discountPercent.toFixed(0)}% off
+                                                    </div>
+                                                  )}
+                                                  {product.distributorPricing.isPreferred && (
+                                                    <div className="text-xs text-blue-600 font-medium mt-1">
+                                                      Preferred
+                                                    </div>
+                                                  )}
+                                                </>
+                                              ) : (
+                                                <div className="text-sm text-gray-400">No pricing</div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </Link>
                                 ))}

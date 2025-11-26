@@ -8,9 +8,10 @@ const path = require('path');
  * @param {Object} company - Company/Supplier document
  * @param {Object} job - Job document
  * @param {Object} buyer - Buyer User document
+ * @param {Array} products - Optional array of populated products for package quantities
  * @returns {Promise<Buffer>} PDF buffer
  */
-async function generatePOPDF(po, company, job, buyer) {
+async function generatePOPDF(po, company, job, buyer, products = null) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
@@ -128,7 +129,29 @@ async function generatePOPDF(po, company, job, buyer) {
           doc.text(`${index + 1}`, 50, itemY);
           
           // Description (wrap if needed)
-          const desc = item.productName || item.description || 'N/A';
+          let desc = item.productName || item.description || 'N/A';
+          // Add variant name if present
+          if (item.variantName) {
+            desc = `${desc} - ${item.variantName}`;
+          }
+          
+          // Add package quantity if available
+          let packageInfo = '';
+          if (products && item.productId) {
+            const product = products.find(p => p._id.toString() === item.productId.toString());
+            if (product) {
+              if (item.variantId && product.variants) {
+                const variant = product.variants.find(v => v._id.toString() === item.variantId.toString());
+                if (variant && variant.packageQuantity) {
+                  packageInfo = ` (Package: ${variant.packageQuantity} ${variant.packageUnit || 'EA'})`;
+                }
+              } else if (product.packageQuantity) {
+                packageInfo = ` (Package: ${product.packageQuantity} ${product.packageUnit || 'EA'})`;
+              }
+            }
+          }
+          
+          desc = desc + packageInfo;
           const descLines = doc.heightOfString(desc, { width: 220 });
           doc.text(desc, 120, itemY, { width: 220 });
           
@@ -219,7 +242,147 @@ async function generatePOPDF(po, company, job, buyer) {
   });
 }
 
+/**
+ * Generate Shop Printout PDF for Material Request
+ * @param {Object} materialRequest - Material Request document
+ * @param {Object} job - Job document
+ * @returns {Promise<Buffer>} PDF buffer
+ */
+async function generateShopPrintoutPDF(materialRequest, job) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+      const buffers = [];
+
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        resolve(pdfBuffer);
+      });
+      doc.on('error', reject);
+
+      // Header
+      doc.fontSize(20).font('Helvetica-Bold').text('SHOP PICK LIST', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(16).font('Helvetica').text(`MR Number: ${materialRequest.requestNumber}`, { align: 'center' });
+      doc.moveDown(1);
+
+      // Job Information
+      doc.fontSize(10).font('Helvetica-Bold').text('JOB INFORMATION', 50, 120);
+      doc.font('Helvetica').fontSize(9);
+      if (job) {
+        doc.text(`Job: ${job.jobNumber || job.name || 'N/A'}`, 50, 140);
+        doc.text(`Project: ${job.name || 'N/A'}`, 50, 155);
+        if (job.location) {
+          const location = typeof job.location === 'string' 
+            ? job.location 
+            : [job.location.address, job.location.city, job.location.province].filter(Boolean).join(', ');
+          doc.text(`Location: ${location}`, 50, 170);
+        }
+      }
+      
+      // Request Details
+      let yPos = 200;
+      doc.font('Helvetica-Bold').fontSize(10).text('REQUEST DETAILS', 50, yPos);
+      yPos += 20;
+      doc.font('Helvetica').fontSize(9);
+      doc.text(`Required By: ${new Date(materialRequest.requiredByDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 50, yPos);
+      doc.text(`Priority: ${materialRequest.priority.charAt(0).toUpperCase() + materialRequest.priority.slice(1)}`, 50, yPos + 15);
+      doc.text(`Delivery Location: ${materialRequest.deliveryLocation.charAt(0).toUpperCase() + materialRequest.deliveryLocation.slice(1)}`, 50, yPos + 30);
+      
+      if (materialRequest.deliveryAddress) {
+        doc.text(`Delivery Address: ${materialRequest.deliveryAddress}`, 50, yPos + 45);
+        yPos += 15;
+      }
+      
+      if (materialRequest.deliveryNotes) {
+        yPos += 15;
+        doc.text(`Delivery Notes: ${materialRequest.deliveryNotes}`, 50, yPos, { width: 500 });
+        yPos += 30;
+      } else {
+        yPos += 60;
+      }
+
+      // Line Items Table
+      doc.moveTo(50, yPos).lineTo(550, yPos).stroke();
+      yPos += 15;
+
+      // Table Header
+      doc.font('Helvetica-Bold').fontSize(9);
+      doc.text('Item', 50, yPos);
+      doc.text('Product', 120, yPos);
+      doc.text('Qty', 350, yPos);
+      doc.text('Unit', 380, yPos);
+      doc.text('Notes', 420, yPos);
+
+      yPos += 15;
+      doc.moveTo(50, yPos).lineTo(550, yPos).stroke();
+      yPos += 10;
+
+      // Line Items
+      doc.font('Helvetica').fontSize(8);
+      if (materialRequest.lineItems && materialRequest.lineItems.length > 0) {
+        materialRequest.lineItems.forEach((item, index) => {
+          const itemY = yPos;
+          
+          // Item number
+          doc.text(`${index + 1}`, 50, itemY);
+          
+          // Product name and description
+          let productText = item.productName || 'N/A';
+          if (item.variantName) {
+            productText = `${productText} - ${item.variantName}`;
+          }
+          if (item.description) {
+            productText = `${productText}\n${item.description}`;
+          }
+          const productLines = doc.heightOfString(productText, { width: 220 });
+          doc.text(productText, 120, itemY, { width: 220 });
+          
+          // Quantity
+          doc.text(String(item.quantity || 0), 350, itemY);
+          
+          // Unit
+          doc.text(item.unit || 'EA', 380, itemY);
+          
+          // Notes
+          if (item.notes) {
+            doc.text(item.notes, 420, itemY, { width: 130 });
+          }
+          
+          // Fulfillment source indicator
+          if (item.fulfillmentSource === 'inventory') {
+            doc.fontSize(7).font('Helvetica-Bold').fillColor('blue');
+            doc.text('FROM INVENTORY', 120, itemY + productLines + 5);
+            doc.fillColor('black').font('Helvetica').fontSize(8);
+          }
+          
+          yPos = itemY + Math.max(productLines, 15) + (item.notes ? 10 : 5) + (item.fulfillmentSource === 'inventory' ? 10 : 0);
+        });
+      } else {
+        doc.text('No line items', 50, yPos);
+        yPos += 15;
+      }
+
+      yPos += 10;
+      doc.moveTo(50, yPos).lineTo(550, yPos).stroke();
+
+      // Footer
+      const pageHeight = doc.page.height;
+      const footerY = pageHeight - 50;
+      doc.fontSize(7).font('Helvetica-Oblique');
+      doc.text(`Generated: ${new Date().toLocaleString('en-US')}`, 50, footerY);
+      doc.text(`Request Number: ${materialRequest.requestNumber}`, 50, footerY + 10, { align: 'left' });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 module.exports = {
-  generatePOPDF
+  generatePOPDF,
+  generateShopPrintoutPDF
 };
 

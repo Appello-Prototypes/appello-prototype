@@ -169,7 +169,11 @@ const discountController = {
       } else if (discount.discountType === 'product') {
         query._id = discount.productId;
       } else if (discount.discountType === 'supplier') {
-        query['suppliers.supplierId'] = discount.supplierId;
+        // Check both manufacturerId and suppliers.manufacturerId
+        query.$or = [
+          { manufacturerId: discount.supplierId },
+          { 'suppliers.manufacturerId': discount.supplierId }
+        ];
       }
       
       const products = await Product.find(query);
@@ -266,7 +270,11 @@ const discountController = {
           } else if (discount.discountType === 'product') {
             query._id = discount.productId;
           } else if (discount.discountType === 'supplier') {
-            query['suppliers.supplierId'] = discount.supplierId;
+            // Check both manufacturerId and suppliers.manufacturerId
+            query.$or = [
+              { manufacturerId: discount.supplierId },
+              { 'suppliers.manufacturerId': discount.supplierId }
+            ];
           }
           
           const products = await Product.find(query);

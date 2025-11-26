@@ -21,8 +21,8 @@ export default function ProductForm() {
     productTypeId: '',
     properties: {},
     suppliers: [],
-    supplierId: '',
-    supplierCatalogNumber: '',
+    manufacturerId: '',
+    distributorId: '',
     lastPrice: '',
     unitOfMeasure: 'EA',
     category: '',
@@ -41,6 +41,16 @@ export default function ProductForm() {
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => companyAPI.getCompanies({ companyType: 'supplier' }).then(res => res.data.data),
+  })
+
+  const { data: manufacturers } = useQuery({
+    queryKey: ['manufacturers'],
+    queryFn: () => companyAPI.getManufacturers().then(res => res.data.data),
+  })
+
+  const { data: distributors } = useQuery({
+    queryKey: ['distributors'],
+    queryFn: () => companyAPI.getDistributors().then(res => res.data.data),
   })
 
   const { data: productTypes } = useQuery({
@@ -77,6 +87,19 @@ export default function ProductForm() {
             : product.productTypeId)
         : '';
 
+      // Extract manufacturerId and distributorId - handle both populated object and string ID
+      const manufacturerId = product.manufacturerId 
+        ? (typeof product.manufacturerId === 'object' 
+            ? product.manufacturerId._id || product.manufacturerId.id 
+            : product.manufacturerId)
+        : '';
+      
+      const distributorId = product.distributorId 
+        ? (typeof product.distributorId === 'object' 
+            ? product.distributorId._id || product.distributorId.id 
+            : product.distributorId)
+        : '';
+
       setFormData({
         name: product.name || '',
         description: product.description || '',
@@ -84,8 +107,8 @@ export default function ProductForm() {
         productTypeId: productTypeId,
         properties: properties,
         suppliers: product.suppliers || [],
-        supplierId: product.supplierId?._id || product.supplierId || '',
-        supplierCatalogNumber: product.supplierCatalogNumber || '',
+        manufacturerId: manufacturerId,
+        distributorId: distributorId,
         lastPrice: product.lastPrice || '',
         unitOfMeasure: product.unitOfMeasure || 'EA',
         category: product.category || '',
@@ -428,36 +451,50 @@ export default function ProductForm() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Supplier *
+                Manufacturer (Supplier) *
               </label>
               <select
-                name="supplierId"
-                value={formData.supplierId}
+                name="manufacturerId"
+                value={formData.manufacturerId}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
-                <option value="">Select a supplier</option>
-                {suppliers?.map((supplier) => (
-                  <option key={supplier._id} value={supplier._id}>
-                    {supplier.name}
+                <option value="">Select a manufacturer</option>
+                {manufacturers?.map((manufacturer) => (
+                  <option key={manufacturer._id} value={manufacturer._id}>
+                    {manufacturer.name}
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                The company that manufactures this product
+              </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Supplier Catalog Number (SKU)
+                Distributor *
               </label>
-              <input
-                type="text"
-                name="supplierCatalogNumber"
-                value={formData.supplierCatalogNumber}
+              <select
+                name="distributorId"
+                value={formData.distributorId}
                 onChange={handleChange}
+                required
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
+              >
+                <option value="">Select a distributor</option>
+                {distributors?.map((distributor) => (
+                  <option key={distributor._id} value={distributor._id}>
+                    {distributor.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                The distributor who supplies this product to us (sets the price)
+              </p>
             </div>
+
 
             <div>
               <label className="block text-sm font-medium text-gray-700">

@@ -3,6 +3,7 @@ const POReceipt = require('../models/POReceipt');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const Job = require('../models/Job');
 const Product = require('../models/Product');
+const Inventory = require('../models/Inventory');
 
 // Configuration for over-receipt tolerance
 const OVER_RECEIPT_TOLERANCE = process.env.OVER_RECEIPT_TOLERANCE || 0.05; // Default 5%
@@ -256,8 +257,92 @@ const poReceiptController = {
 
       await purchaseOrder.save();
 
+      // Update inventory for products with inventory tracking enabled
+      for (const receiptItem of receipt.receiptItems) {
+        if (receiptItem.productId) {
+          try {
+            const product = await Product.findById(receiptItem.productId);
+            if (product && product.inventoryTracking?.enabled) {
+              // Find or create inventory record
+              let inventory = await Inventory.findOne({
+                productId: receiptItem.productId,
+                variantId: null // Base product, no variant
+              });
+
+              if (!inventory) {
+                // Create new inventory record
+                inventory = new Inventory({
+                  productId: receiptItem.productId,
+                  variantId: null,
+                  inventoryType: product.inventoryTracking.type || 'bulk',
+                  quantityOnHand: 0,
+                  quantityReserved: 0,
+                  primaryLocation: receipt.locationPlaced || product.inventoryTracking.defaultLocation || 'Warehouse',
+                  costMethod: 'fifo',
+                  averageCost: receiptItem.unitPrice || 0
+                });
+              }
+
+              // Add receipt transaction
+              const transactionQuantity = receiptItem.quantityReceived;
+              const unitCost = receiptItem.unitPrice || inventory.averageCost || 0;
+              
+              if (inventory.inventoryType === 'bulk') {
+                // Update bulk inventory
+                inventory.quantityOnHand += transactionQuantity;
+                
+                // Update average cost (weighted average)
+                const currentValue = inventory.quantityOnHand * inventory.averageCost;
+                const receiptValue = transactionQuantity * unitCost;
+                const newQuantity = inventory.quantityOnHand;
+                inventory.averageCost = newQuantity > 0 ? (currentValue + receiptValue) / newQuantity : unitCost;
+                
+                // Update location if provided
+                if (receipt.locationPlaced) {
+                  const location = inventory.locations.find(l => l.location === receipt.locationPlaced);
+                  if (location) {
+                    location.quantity += transactionQuantity;
+                  } else {
+                    inventory.locations.push({
+                      location: receipt.locationPlaced,
+                      quantity: transactionQuantity
+                    });
+                  }
+                  if (!inventory.primaryLocation) {
+                    inventory.primaryLocation = receipt.locationPlaced;
+                  }
+                }
+              }
+              // For serialized items, serial numbers would be added via AddSerializedUnits API
+
+              // Add transaction to history with full receipt details
+              inventory.transactions.push({
+                type: 'receipt',
+                quantity: transactionQuantity,
+                serialNumbers: [],
+                unitCost: unitCost,
+                totalCost: transactionQuantity * unitCost,
+                referenceType: 'purchase_order',
+                referenceId: receipt.purchaseOrderId,
+                receiptId: receipt._id, // Link to PO Receipt document
+                receiptNumber: receipt.receiptNumber, // Store receipt number for easy access
+                toLocation: receipt.locationPlaced || inventory.primaryLocation,
+                notes: receiptItem.conditionNotes || receipt.notes || `Received from ${receipt.receiptNumber || 'PO Receipt'}`,
+                condition: receiptItem.condition, // Store condition (good/damaged/incorrect_item)
+                performedBy: receipt.receivedBy,
+                performedAt: receipt.receivedAt || new Date()
+              });
+
+              await inventory.save();
+            }
+          } catch (invError) {
+            console.error(`Error updating inventory for product ${receiptItem.productId}:`, invError);
+            // Don't fail the receipt creation if inventory update fails
+          }
+        }
+      }
+
       // TODO: Post costs to job cost codes (Phase 4)
-      // TODO: Update inventory if stock items (Phase 4)
 
       res.status(201).json({
         success: true,

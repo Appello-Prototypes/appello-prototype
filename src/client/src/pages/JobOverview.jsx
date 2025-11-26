@@ -19,6 +19,7 @@ import {
   UserIcon
 } from '@heroicons/react/24/outline'
 import { api } from '../services/api'
+import AIAssistant from '../components/AIAssistant'
 import {
   LineChart,
   Line,
@@ -966,6 +967,9 @@ const JobOverview = () => {
         </Link>
         </div>
       </div>
+      
+      {/* AI Assistant */}
+      <AIAssistant jobId={jobId} />
     </div>
   )
 }

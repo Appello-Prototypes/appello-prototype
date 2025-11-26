@@ -51,7 +51,42 @@ const CompanyLayout = () => {
           description: 'View all products from this supplier'
         }
       ]
-    }
+    },
+    ...(companyData?.companyType === 'distributor' ? [{
+      id: 'manufacturers',
+      name: 'Manufacturers',
+      icon: BuildingOfficeIcon,
+      items: [
+        {
+          id: 'manufacturers',
+          name: 'Manufacturers',
+          icon: BuildingOfficeIcon,
+          path: `/companies/${id}/manufacturers`,
+          description: 'View all manufacturers this distributor carries'
+        }
+      ]
+    }] : []),
+    ...(companyData?.companyType === 'supplier' ? [{
+      id: 'distributors',
+      name: 'Distributors',
+      icon: BuildingOfficeIcon,
+      items: [
+        {
+          id: 'distributors',
+          name: 'Distributors',
+          icon: BuildingOfficeIcon,
+          path: `/companies/${id}/distributors`,
+          description: 'View all distributors who carry this manufacturer'
+        },
+        {
+          id: 'price-comparison',
+          name: 'Price Comparison',
+          icon: BuildingOfficeIcon,
+          path: `/companies/${id}/price-comparison`,
+          description: 'Compare prices across distributors'
+        }
+      ]
+    }] : [])
   ]
 
   // Flatten all tabs for active tab detection
@@ -169,7 +204,8 @@ const CompanyLayout = () => {
                 <h1 className="text-3xl font-bold text-gray-900">{companyData.name}</h1>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                   companyData.companyType === 'supplier' ? 'bg-blue-100 text-blue-800' :
-                  companyData.companyType === 'client' ? 'bg-green-100 text-green-800' :
+                  companyData.companyType === 'customer' ? 'bg-green-100 text-green-800' :
+                  companyData.companyType === 'distributor' ? 'bg-orange-100 text-orange-800' :
                   companyData.companyType === 'subcontractor' ? 'bg-purple-100 text-purple-800' :
                   'bg-gray-100 text-gray-800'
                 }`}>

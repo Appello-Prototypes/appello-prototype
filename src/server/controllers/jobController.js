@@ -10,6 +10,7 @@ const Phase = require('../models/Phase');
 const Module = require('../models/Module');
 const Component = require('../models/Component');
 const ScheduleOfValues = require('../models/ScheduleOfValues');
+const Product = require('../models/Product');
 const { validationResult } = require('express-validator');
 
 const jobController = {
@@ -623,6 +624,253 @@ const jobController = {
         success: false,
         message: 'Error fetching enhanced job tasks',
         error: error.message
+      });
+    }
+  },
+
+  // GET /api/jobs/:id/approved-products
+  getApprovedProducts: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job ID format'
+        });
+      }
+
+      const job = await Job.findById(req.params.id)
+        .populate('approvedProducts')
+        .select('approvedProducts approvedProductVariants specEnforcementEnabled specOverridePermission')
+        .lean();
+
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Populate variant details
+      const variantsWithProducts = await Promise.all(
+        (job.approvedProductVariants || []).map(async (variantRef) => {
+          const product = await Product.findById(variantRef.productId).lean();
+          if (!product) return null;
+          const variant = product.variants?.find(v => v._id.toString() === variantRef.variantId.toString());
+          return {
+            productId: variantRef.productId,
+            variantId: variantRef.variantId,
+            product: product,
+            variant: variant
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        data: {
+          approvedProducts: job.approvedProducts || [],
+          approvedVariants: variantsWithProducts.filter(Boolean),
+          specEnforcementEnabled: job.specEnforcementEnabled || false,
+          specOverridePermission: job.specOverridePermission || 'none'
+        }
+      });
+    } catch (error) {
+      console.error('Error in getApprovedProducts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching approved products',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  },
+
+  // POST /api/jobs/:id/approved-products
+  addApprovedProduct: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job ID format'
+        });
+      }
+
+      const { productId, variantId } = req.body;
+
+      if (!productId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product ID is required'
+        });
+      }
+
+      const job = await Job.findById(req.params.id);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify product exists
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found'
+        });
+      }
+
+      // Add product or variant
+      if (variantId) {
+        // Add variant
+        const variantExists = product.variants?.some(v => v._id.toString() === variantId.toString());
+        if (!variantExists) {
+          return res.status(400).json({
+            success: false,
+            message: 'Variant not found in product'
+          });
+        }
+
+        // Check if already added
+        const alreadyAdded = job.approvedProductVariants?.some(
+          v => v.productId.toString() === productId && v.variantId.toString() === variantId
+        );
+
+        if (!alreadyAdded) {
+          if (!job.approvedProductVariants) {
+            job.approvedProductVariants = [];
+          }
+          job.approvedProductVariants.push({ productId, variantId });
+        }
+      } else {
+        // Add entire product
+        if (!job.approvedProducts) {
+          job.approvedProducts = [];
+        }
+        if (!job.approvedProducts.includes(productId)) {
+          job.approvedProducts.push(productId);
+        }
+      }
+
+      await job.save();
+
+      res.json({
+        success: true,
+        data: job
+      });
+    } catch (error) {
+      console.error('Error in addApprovedProduct:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error adding approved product',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  },
+
+  // DELETE /api/jobs/:id/approved-products/:productId
+  removeApprovedProduct: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.productId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job or product ID format'
+        });
+      }
+
+      const { variantId } = req.query;
+
+      const job = await Job.findById(req.params.id);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      if (variantId) {
+        // Remove variant
+        if (job.approvedProductVariants) {
+          job.approvedProductVariants = job.approvedProductVariants.filter(
+            v => !(v.productId.toString() === req.params.productId && v.variantId.toString() === variantId)
+          );
+        }
+      } else {
+        // Remove entire product
+        if (job.approvedProducts) {
+          job.approvedProducts = job.approvedProducts.filter(
+            p => p.toString() !== req.params.productId
+          );
+        }
+        // Also remove all variants of this product
+        if (job.approvedProductVariants) {
+          job.approvedProductVariants = job.approvedProductVariants.filter(
+            v => v.productId.toString() !== req.params.productId
+          );
+        }
+      }
+
+      await job.save();
+
+      res.json({
+        success: true,
+        data: job
+      });
+    } catch (error) {
+      console.error('Error in removeApprovedProduct:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error removing approved product',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
+    }
+  },
+
+  // PATCH /api/jobs/:id/spec-settings
+  updateSpecSettings: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid job ID format'
+        });
+      }
+
+      const { specEnforcementEnabled, specOverridePermission } = req.body;
+
+      const job = await Job.findById(req.params.id);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      if (specEnforcementEnabled !== undefined) {
+        job.specEnforcementEnabled = specEnforcementEnabled;
+      }
+      if (specOverridePermission !== undefined) {
+        if (!['none', 'manager', 'estimator', 'all'].includes(specOverridePermission)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid specOverridePermission value'
+          });
+        }
+        job.specOverridePermission = specOverridePermission;
+      }
+
+      await job.save();
+
+      res.json({
+        success: true,
+        data: job
+      });
+    } catch (error) {
+      console.error('Error in updateSpecSettings:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating spec settings',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   }

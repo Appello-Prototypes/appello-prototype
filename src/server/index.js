@@ -16,7 +16,8 @@ let sovRoutes, financialRoutes, workOrderRoutes;
 let companyRoutes, productRoutes, productTypeRoutes, materialRequestRoutes;
 let purchaseOrderRoutes, poReceiptRoutes, inventoryRoutes, discountRoutes;
 let uploadRoutes, specificationRoutes, specificationTemplateRoutes;
-let propertyDefinitionRoutes, unitOfMeasureRoutes;
+let propertyDefinitionRoutes, unitOfMeasureRoutes, locationRoutes;
+let aiRoutes;
 let handleUploadError;
 
 try {
@@ -86,6 +87,12 @@ try {
 try {
   unitOfMeasureRoutes = require('./routes/unitOfMeasures');
 } catch (e) { console.error('Failed to load unitOfMeasureRoutes:', e.message); }
+try {
+  locationRoutes = require('./routes/locations');
+} catch (e) { console.error('Failed to load locationRoutes:', e.message); }
+try {
+  aiRoutes = require('./routes/ai');
+} catch (e) { console.error('Failed to load aiRoutes:', e.message); }
 try {
   handleUploadError = require('./middleware/upload').handleUploadError;
 } catch (e) { console.error('Failed to load handleUploadError:', e.message); }
@@ -431,6 +438,8 @@ if (specificationRoutes) app.use('/api', ensureDBConnection, specificationRoutes
 if (specificationTemplateRoutes) app.use('/api/specification-templates', ensureDBConnection, specificationTemplateRoutes);
 if (propertyDefinitionRoutes) app.use('/api/property-definitions', ensureDBConnection, propertyDefinitionRoutes);
 if (unitOfMeasureRoutes) app.use('/api/units-of-measure', ensureDBConnection, unitOfMeasureRoutes);
+if (locationRoutes) app.use('/api/locations', ensureDBConnection, locationRoutes);
+if (aiRoutes) app.use('/api/ai', ensureDBConnection, aiRoutes);
 
 // Version endpoint
 app.get('/api/version', (req, res) => {

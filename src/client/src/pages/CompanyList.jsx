@@ -88,8 +88,9 @@ export default function CompanyList() {
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="all">All Types</option>
+            <option value="customer">Customers</option>
             <option value="supplier">Suppliers</option>
-            <option value="client">Clients</option>
+            <option value="distributor">Distributors</option>
             <option value="subcontractor">Subcontractors</option>
             <option value="other">Other</option>
           </select>

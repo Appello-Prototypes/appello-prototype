@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftIcon, PencilIcon, BuildingOfficeIcon, CubeIcon, CurrencyDollarIcon, Squares2X2Icon, TableCellsIcon, WrenchScrewdriverIcon, ClockIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { productAPI, productTypeAPI, api } from '../services/api'
 import toast from 'react-hot-toast'
+import ProductStatusDropdown from '../components/ProductStatusDropdown'
 
 const VIEWS = {
   CARD: 'card',
@@ -22,6 +23,22 @@ export default function ProductDetail() {
     queryKey: ['product', id],
     queryFn: () => productAPI.getProduct(id).then(res => res.data.data),
   })
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ productId, isActive }) => productAPI.updateProduct(productId, { isActive }),
+    onSuccess: () => {
+      toast.success('Status updated successfully')
+      queryClient.invalidateQueries(['product', id])
+      queryClient.invalidateQueries(['products'])
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to update status')
+    },
+  })
+
+  const handleStatusChange = (isActive) => {
+    updateStatusMutation.mutate({ productId: id, isActive })
+  }
 
 
   const { data: suppliers } = useQuery({
@@ -169,6 +186,33 @@ export default function ProductDetail() {
         </div>
 
         <div className="p-6">
+          {/* Relationship Summary */}
+          {product.suppliers && product.suppliers.length > 0 && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-medium text-blue-900 mb-2">Product Supply Chain</h3>
+              <div className="text-xs text-blue-800 space-y-1">
+                <p>
+                  <span className="font-medium">Manufacturer:</span> {product.manufacturerId && (
+                    typeof product.manufacturerId === 'object' 
+                      ? product.manufacturerId.name 
+                      : 'Unknown'
+                  )}
+                </p>
+                <p>
+                  <span className="font-medium">Available from {product.suppliers.length} distributor{product.suppliers.length !== 1 ? 's' : ''}:</span>{' '}
+                  {product.suppliers.map((s, idx) => {
+                    const dist = s.distributorId;
+                    const name = typeof dist === 'object' ? dist.name : dist;
+                    return name;
+                  }).filter(Boolean).join(', ')}
+                </p>
+                <p className="text-blue-700 mt-2">
+                  💡 Distributors set the price. The same product can have different prices from different distributors.
+                </p>
+              </div>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h2 className="text-lg font-medium text-gray-900 mb-4">Product Information</h2>
@@ -183,6 +227,112 @@ export default function ProductDetail() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Product Type</dt>
                     <dd className="mt-1 text-sm text-gray-900">{productType.name}</dd>
+                  </div>
+                )}
+                {product.manufacturerId && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Manufacturer</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {typeof product.manufacturerId === 'object' ? (
+                        <Link
+                          to={`/companies/${product.manufacturerId._id}`}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          {product.manufacturerId.name}
+                        </Link>
+                      ) : (
+                        product.manufacturerId
+                      )}
+                    </dd>
+                  </div>
+                )}
+                {/* Distributors Section */}
+                {product.suppliers && product.suppliers.length > 0 && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Distributors</dt>
+                    <dd className="mt-1">
+                      <div className="space-y-2">
+                        {product.suppliers.map((supplier, idx) => {
+                          const distributor = supplier.distributorId;
+                          if (!distributor) return null;
+                          
+                          const distributorName = typeof distributor === 'object' 
+                            ? distributor.name 
+                            : 'Unknown Distributor';
+                          const distributorId = typeof distributor === 'object' 
+                            ? distributor._id 
+                            : distributor;
+                          const isPrimary = product.distributorId && (
+                            typeof product.distributorId === 'object'
+                              ? product.distributorId._id.toString() === distributorId?.toString()
+                              : product.distributorId.toString() === distributorId?.toString()
+                          );
+                          
+                          return (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex-1">
+                                {distributorId ? (
+                                  <Link
+                                    to={`/companies/${distributorId}`}
+                                    className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                  >
+                                    {distributorName}
+                                  </Link>
+                                ) : (
+                                  <span className="font-medium text-sm">{distributorName}</span>
+                                )}
+                                {isPrimary && (
+                                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Primary</span>
+                                )}
+                                {(supplier.listPrice || supplier.netPrice) && (
+                                  <div className="mt-2 space-y-1">
+                                    {supplier.listPrice && (
+                                      <div className="text-xs text-gray-600">
+                                        <span className="font-medium">List:</span> ${supplier.listPrice.toFixed(2)}
+                                      </div>
+                                    )}
+                                    {supplier.netPrice && (
+                                      <div className="text-xs text-gray-900">
+                                        <span className="font-medium">Net:</span> ${supplier.netPrice.toFixed(2)}
+                                      </div>
+                                    )}
+                                    {supplier.discountPercent && (
+                                      <div className="text-xs text-gray-500">
+                                        {supplier.discountPercent.toFixed(1)}% discount
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {supplier.isPreferred && (
+                                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                    Preferred
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </dd>
+                  </div>
+                )}
+                {(!product.suppliers || product.suppliers.length === 0) && product.distributorId && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Distributor</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {typeof product.distributorId === 'object' ? (
+                        <Link
+                          to={`/companies/${product.distributorId._id}`}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          {product.distributorId.name}
+                        </Link>
+                      ) : (
+                        product.distributorId
+                      )}
+                    </dd>
                   </div>
                 )}
                 <div>
@@ -212,13 +362,11 @@ export default function ProductDetail() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Status</dt>
                   <dd className="mt-1">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      product.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {product.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                    <ProductStatusDropdown
+                      value={product.isActive !== false}
+                      onChange={handleStatusChange}
+                      disabled={updateStatusMutation.isLoading}
+                    />
                   </dd>
                 </div>
               </dl>
@@ -261,78 +409,71 @@ export default function ProductDetail() {
             <div>
               <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                 <BuildingOfficeIcon className="h-5 w-5 mr-2" />
-                Suppliers ({suppliers?.length || 0})
+                Manufacturers ({suppliers?.length || 0})
               </h2>
               {suppliers && suppliers.length > 0 ? (
-                <div className="space-y-4">
-                  {suppliers.map((supplierInfo, idx) => (
-                    <div
-                      key={idx}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <Link
-                            to={`/companies/${supplierInfo.supplier._id}`}
-                            className="text-lg font-medium text-blue-600 hover:text-blue-800"
-                          >
-                            {supplierInfo.supplier.name}
-                          </Link>
-                          {supplierInfo.supplierPartNumber && supplierInfo.supplierPartNumber !== '0' && supplierInfo.supplierPartNumber.trim() !== '' && (
-                            <p className="mt-1 text-sm text-gray-600">
-                              Part #: {supplierInfo.supplierPartNumber}
-                            </p>
-                          )}
-                          {((supplierInfo.listPrice && supplierInfo.listPrice > 0) || 
-                            (supplierInfo.netPrice && supplierInfo.netPrice > 0) || 
-                            (supplierInfo.lastPrice && supplierInfo.lastPrice > 0)) && (
-                            <div className="mt-1 text-sm">
-                              {supplierInfo.listPrice > 0 && (
-                                <p className="text-gray-600">
-                                  List Price: ${supplierInfo.listPrice.toFixed(2)}/{product.unitOfMeasure}
-                                </p>
-                              )}
-                              {supplierInfo.netPrice > 0 && (
-                                <p className="font-medium text-gray-900">
-                                  Net Price: ${supplierInfo.netPrice.toFixed(2)}/{product.unitOfMeasure}
-                                </p>
-                              )}
-                              {supplierInfo.discountPercent > 0 && (
-                                <p className="text-xs text-gray-500">
-                                  Discount: {supplierInfo.discountPercent.toFixed(2)}%
-                                </p>
-                              )}
-                              {/* Legacy: Show lastPrice only if listPrice/netPrice not available */}
-                              {!supplierInfo.listPrice && !supplierInfo.netPrice && supplierInfo.lastPrice > 0 && (
-                                <p className="font-medium text-gray-900">
-                                  Last Price: ${supplierInfo.lastPrice.toFixed(2)}/{product.unitOfMeasure}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          {supplierInfo.lastPurchasedDate && (
+                <div className="space-y-3">
+                  {suppliers.map((supplierInfo, idx) => {
+                    const manufacturer = supplierInfo.manufacturer;
+                    if (!manufacturer) return null;
+                    
+                    return (
+                      <div
+                        key={idx}
+                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <Link
+                              to={`/companies/${manufacturer._id}`}
+                              className="text-base font-medium text-blue-600 hover:text-blue-800"
+                            >
+                              {manufacturer.name}
+                            </Link>
+                            {supplierInfo.supplierPartNumber && supplierInfo.supplierPartNumber !== '0' && supplierInfo.supplierPartNumber.trim() !== '' && (
+                              <p className="mt-1 text-sm text-gray-600">
+                                Part #: {supplierInfo.supplierPartNumber}
+                              </p>
+                            )}
                             <p className="mt-1 text-xs text-gray-500">
-                              Last Purchased: {new Date(supplierInfo.lastPurchasedDate).toLocaleDateString()}
+                              Manufacturer (makes this product)
                             </p>
+                            {supplierInfo.lastPurchasedDate && (
+                              <p className="mt-2 text-xs text-gray-500">
+                                Last Purchased: {new Date(supplierInfo.lastPurchasedDate).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          {supplierInfo.isPreferred && (
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Preferred
+                            </span>
                           )}
                         </div>
-                        {supplierInfo.isPreferred && (
-                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Preferred
-                          </span>
+                        {manufacturer.contact?.email && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Contact: {manufacturer.contact.email}
+                          </p>
                         )}
                       </div>
-                      {supplierInfo.supplier.contact?.email && (
-                        <p className="mt-2 text-xs text-gray-500">
-                          Contact: {supplierInfo.supplier.contact.email}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+              ) : product.manufacturerId ? (
+                <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                  <Link
+                    to={`/companies/${typeof product.manufacturerId === 'object' ? product.manufacturerId._id : product.manufacturerId}`}
+                    className="text-base font-medium text-blue-600 hover:text-blue-800"
+                  >
+                    {typeof product.manufacturerId === 'object' ? product.manufacturerId.name : 'Manufacturer'}
+                  </Link>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Manufacturer (makes this product)
+                  </p>
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No suppliers found for this product</p>
+                <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
+                  <p className="text-sm">No manufacturer information available</p>
                 </div>
               )}
             </div>

@@ -22,6 +22,255 @@ const Product = require('../src/server/models/Product');
 const ProductType = require('../src/server/models/ProductType');
 const Discount = require('../src/server/models/Discount');
 
+/**
+ * Get or create IMPRO distributor
+ */
+async function getImportDistributor() {
+  return await Company.findOneAndUpdate(
+    { name: 'IMPRO', companyType: 'distributor' },
+    {
+      name: 'IMPRO',
+      companyType: 'distributor',
+      isActive: true
+    },
+    { upsert: true, new: true }
+  );
+}
+
+/**
+ * Find or create product by manufacturer + name (ensures uniqueness across distributors)
+ * This is the key function for multi-distributor support - same product from different
+ * distributors will share the same product record, with separate pricing in suppliers array
+ */
+async function findOrCreateProductByManufacturer(productData, manufacturer, distributor) {
+  const { name, description, productTypeId, pricebookSection, pricebookPageNumber, pricebookPageName, pricebookGroupCode, unitOfMeasure } = productData;
+  
+  // Build query: find by manufacturer + name (ensures uniqueness)
+  const query = {
+    name: name
+  };
+  
+  // Include manufacturerId in query if available (key for uniqueness)
+  if (manufacturer && manufacturer._id) {
+    query.manufacturerId = manufacturer._id;
+  }
+  
+  // Find existing product
+  let product = await Product.findOne(query);
+  
+  if (product) {
+    // Product exists - update primary distributor and merge supplier entry
+    product.distributorId = distributor._id; // Set as primary (most recent)
+    if (manufacturer && manufacturer._id) {
+      product.manufacturerId = manufacturer._id;
+    }
+    
+    // Update other fields if provided
+    if (description) product.description = description;
+    if (productTypeId) product.productTypeId = productTypeId;
+    if (pricebookSection !== undefined) product.pricebookSection = pricebookSection;
+    if (pricebookPageNumber !== undefined) product.pricebookPageNumber = pricebookPageNumber;
+    if (pricebookPageName) product.pricebookPageName = pricebookPageName;
+    if (pricebookGroupCode) product.pricebookGroupCode = pricebookGroupCode;
+    if (unitOfMeasure) product.unitOfMeasure = unitOfMeasure;
+    
+    // Check if supplier entry for this distributor already exists
+    const existingSupplierIndex = product.suppliers.findIndex(
+      s => s.distributorId && s.distributorId.toString() === distributor._id.toString()
+    );
+    
+    if (existingSupplierIndex >= 0) {
+      // Update existing supplier entry
+      const existingSupplier = product.suppliers[existingSupplierIndex].toObject();
+      product.suppliers[existingSupplierIndex] = {
+        ...existingSupplier,
+        distributorId: distributor._id,
+        manufacturerId: manufacturer ? manufacturer._id : existingSupplier.manufacturerId,
+        ...productData.supplierEntry // Merge new data
+      };
+    } else {
+      // Add new supplier entry (don't replace existing ones)
+      product.suppliers.push({
+        distributorId: distributor._id,
+        manufacturerId: manufacturer ? manufacturer._id : null,
+        ...productData.supplierEntry
+      });
+    }
+    
+    await product.save();
+  } else {
+    // Product doesn't exist - create new one
+    product = await Product.create({
+      name,
+      description,
+      productTypeId,
+      manufacturerId: manufacturer ? manufacturer._id : null,
+      distributorId: distributor._id,
+      suppliers: [{
+        distributorId: distributor._id,
+        manufacturerId: manufacturer ? manufacturer._id : null,
+        ...productData.supplierEntry
+      }],
+      pricebookSection,
+      pricebookPageNumber,
+      pricebookPageName,
+      pricebookGroupCode,
+      unitOfMeasure: unitOfMeasure || 'EA',
+      isActive: true
+    });
+  }
+  
+  return product;
+}
+
+/**
+ * Merge variant supplier entry - adds or updates distributor pricing for a variant
+ * Returns the updated variant object (for Mongoose subdocuments)
+ */
+function mergeVariantSupplierEntry(variant, distributorId, manufacturerId, supplierEntry) {
+  // Convert variant suppliers to array if needed
+  if (!variant.suppliers) {
+    variant.suppliers = [];
+  }
+  
+  // Find existing supplier entry for this distributor
+  const existingIndex = variant.suppliers.findIndex(
+    s => s.distributorId && s.distributorId.toString() === distributorId.toString()
+  );
+  
+  if (existingIndex >= 0) {
+    // Update existing entry
+    const existing = variant.suppliers[existingIndex].toObject ? 
+      variant.suppliers[existingIndex].toObject() : 
+      variant.suppliers[existingIndex];
+    variant.suppliers[existingIndex] = {
+      ...existing,
+      distributorId,
+      manufacturerId,
+      ...supplierEntry
+    };
+  } else {
+    // Add new entry
+    variant.suppliers.push({
+      distributorId,
+      manufacturerId,
+      ...supplierEntry
+    });
+  }
+  
+  return variant;
+}
+
+/**
+ * Create or update distributor-supplier relationship
+ * This tracks which suppliers (manufacturers) each distributor works with
+ */
+async function createDistributorSupplierRelationship(distributorId, supplierId) {
+  const distributor = await Company.findById(distributorId);
+  if (!distributor || distributor.companyType !== 'distributor') {
+    return;
+  }
+
+  const supplier = await Company.findById(supplierId);
+  if (!supplier || supplier.companyType !== 'supplier') {
+    return;
+  }
+
+  // Check if relationship already exists
+  if (!distributor.distributorSuppliers) {
+    distributor.distributorSuppliers = [];
+  }
+
+  const existingRelationship = distributor.distributorSuppliers.find(
+    ds => ds.supplierId.toString() === supplierId.toString()
+  );
+
+  if (!existingRelationship) {
+    distributor.distributorSuppliers.push({
+      supplierId: supplierId,
+      isActive: true,
+      addedDate: new Date()
+    });
+    await distributor.save();
+  } else if (!existingRelationship.isActive) {
+    existingRelationship.isActive = true;
+    await distributor.save();
+  }
+}
+
+/**
+ * Extract manufacturer name from sheet data
+ * Looks for "Supplier" field in sheet metadata rows
+ */
+function extractManufacturerFromSheet(data) {
+  // Look for rows with "Supplier" label
+  for (let i = 0; i < Math.min(20, data.length); i++) {
+    const row = data[i];
+    if (!row || row.length === 0) continue;
+    
+    const rowText = row.map(c => String(c).toLowerCase()).join(' ');
+    
+    // Check if this row contains "Supplier" label
+    if (rowText.includes('supplier')) {
+      // Find the value after "Supplier" (usually in next column or same row)
+      for (let j = 0; j < row.length; j++) {
+        const cell = String(row[j] || '').toLowerCase().trim();
+        if (cell === 'supplier' && j + 1 < row.length) {
+          const manufacturerName = String(row[j + 1] || '').trim();
+          if (manufacturerName && manufacturerName !== '' && manufacturerName !== 'supplier') {
+            return manufacturerName;
+          }
+        }
+      }
+      
+      // Also check if supplier name is in the row itself
+      for (let j = 0; j < row.length; j++) {
+        const cell = String(row[j] || '').trim();
+        // Skip empty cells and common labels
+        if (cell && cell !== '' && 
+            !cell.toLowerCase().includes('supplier') &&
+            !cell.toLowerCase().includes('category') &&
+            !cell.toLowerCase().includes('class') &&
+            cell.length > 2) {
+          // Check if this looks like a company name (not a label)
+          if (!cell.toLowerCase().includes('description') &&
+              !cell.toLowerCase().includes('discount') &&
+              !cell.match(/^\d+\.?\d*%?$/)) {
+            return cell;
+          }
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Get or create manufacturer company
+ */
+async function getOrCreateManufacturer(manufacturerName) {
+  if (!manufacturerName || manufacturerName.trim() === '') {
+    return null;
+  }
+  
+  const cleanName = manufacturerName.trim();
+  
+  // Manufacturers are suppliers who make products
+  return await Company.findOneAndUpdate(
+    { 
+      name: cleanName,
+      companyType: 'supplier'
+    },
+    {
+      name: cleanName,
+      companyType: 'supplier',
+      isActive: true
+    },
+    { upsert: true, new: true }
+  );
+}
+
 // Progress tracking file
 const PROGRESS_FILE = path.join(__dirname, 'pricebook-import-progress.json');
 
@@ -133,7 +382,19 @@ function analyzeSheetStructure(data) {
     if (row && row.length > 0) {
       const rowText = row.map(c => String(c).toLowerCase()).join(' ');
       
-      // For fitting matrix, look for "NOMINAL PIPE SIZE" specifically (highest priority)
+      // For elastomeric pipe insulation, look for "INTERIOR DIAMETER" + "COPPER TUBE SIZE" (high priority)
+      const isElastomericHeader = rowText.includes('interior diameter') && rowText.includes('copper tube size');
+      
+      if (isElastomericHeader) {
+        analysis.hasHeaders = true;
+        analysis.headerRow = i;
+        // Data starts 3 rows later (after header, codes row, and sub-header row)
+        analysis.dataStartRow = i + 3;
+        analysis.columns = row;
+        break;
+      }
+      
+      // For fitting matrix, look for "NOMINAL PIPE SIZE" specifically
       const isFittingHeader = rowText.includes('nominal') && rowText.includes('pipe') && rowText.includes('size');
       
       if (isFittingHeader) {
@@ -329,6 +590,19 @@ function analyzeSheetStructure(data) {
              headers.some(h => h.includes('price'))) {
       analysis.format = 'simple-table';
     }
+    // Elastomeric pipe insulation format (Interior Diameter + Copper Tube Size + thickness columns with List/NET/lf-ctn)
+    else if (headers.some(h => h.includes('interior diameter')) && 
+             headers.some(h => h.includes('copper tube size')) &&
+             headers.some(h => h.match(/["']?\d+\/?\d*["']?/))) {
+      // Check if next row has thickness values (like "3/8''", "1/2''")
+      const nextRow = data[analysis.headerRow + 1];
+      if (nextRow && nextRow.some(cell => {
+        const cellStr = String(cell).trim();
+        return cellStr.match(/^\d+\/?\d*["']?$/) || cellStr.match(/^\d+\s*-\s*\d+\/\d+["']?$/);
+      })) {
+        analysis.format = 'elastomeric-pipe-insulation';
+      }
+    }
     // Matrix format (sizes as rows, thicknesses as columns) - generic fallback
     else if (headers.length > 5 && headers.some(h => h.match(/\d/))) {
       analysis.format = 'matrix';
@@ -344,16 +618,20 @@ function analyzeSheetStructure(data) {
 async function processPipeInsulationSheet(data, analysis, sheetInfo) {
   const { groupCode, section, pageNumber, pageName, discountPercent } = sheetInfo;
   
-  // Find supplier (Crossroads C&I)
-  const supplier = await Company.findOneAndUpdate(
-    { name: 'Crossroads C&I', companyType: 'supplier' },
-    {
-      name: 'Crossroads C&I',
-      companyType: 'supplier',
-      isActive: true
-    },
-    { upsert: true, new: true }
-  );
+  // Get IMPRO distributor
+  const distributor = await getImportDistributor();
+  
+  // Extract manufacturer from sheet
+  const manufacturerName = extractManufacturerFromSheet(data);
+  const manufacturer = manufacturerName ? await getOrCreateManufacturer(manufacturerName) : null;
+  
+  // Create distributor-supplier relationship if manufacturer exists
+  if (manufacturer && distributor) {
+    await createDistributorSupplierRelationship(distributor._id, manufacturer._id);
+  }
+  
+  // For backward compatibility, supplier = distributor (who we buy from)
+  const supplier = distributor;
 
   // Get or create product type
   const productType = await ProductType.findOneAndUpdate(
@@ -439,31 +717,70 @@ async function processPipeInsulationSheet(data, analysis, sheetInfo) {
     throw new Error('No valid variants found in sheet');
   }
 
-  // Create or update product
+  // Create or update product using multi-distributor helper
   const productName = pageName || `Product from ${sheetInfo.pageNumber || 'unknown'}`;
-  const product = await Product.findOneAndUpdate(
-    { 
-      name: productName,
-      'suppliers.supplierId': supplier._id
-    },
+  
+  const product = await findOrCreateProductByManufacturer(
     {
       name: productName,
-      description: `Product from ${pageName}`,
+      description: `Product from ${pageName}${manufacturer ? ` by ${manufacturer.name}` : ''}`,
       productTypeId: productType._id,
-      suppliers: [{
-        supplierId: supplier._id,
-        listPrice: null, // Variant-specific pricing
-        isPreferred: true
-      }],
       pricebookSection: section,
       pricebookPageNumber: pageNumber,
       pricebookPageName: pageName,
       pricebookGroupCode: groupCode,
       unitOfMeasure: 'FT',
-      isActive: true,
-      variants: variants.map(v => ({
-        name: `${v.pipeDiameter}" ${v.pipeType === 'copper' ? 'Copper' : 'Iron'} Pipe - ${v.insulationThickness} Insulation`,
-        sku: `ML-${v.pipeType === 'copper' ? 'C' : 'I'}-${v.pipeDiameter.replace(/\s+/g, '').replace(/"/g, '').replace(/\//g, '-')}-${v.insulationThickness.replace(/\s+/g, '').replace(/"/g, '').replace(/\//g, '-')}`.toUpperCase(),
+      supplierEntry: {
+        listPrice: null, // Variant-specific pricing
+        isPreferred: true
+      }
+    },
+    manufacturer,
+    distributor
+  );
+
+  // Process variants - merge supplier entries instead of replacing
+  const newVariants = [];
+  
+  for (const v of variants) {
+    const variantName = `${v.pipeDiameter}" ${v.pipeType === 'copper' ? 'Copper' : 'Iron'} Pipe - ${v.insulationThickness} Insulation`;
+    const variantSku = `ML-${v.pipeType === 'copper' ? 'C' : 'I'}-${v.pipeDiameter.replace(/\s+/g, '').replace(/"/g, '').replace(/\//g, '-')}-${v.insulationThickness.replace(/\s+/g, '').replace(/"/g, '').replace(/\//g, '-')}`.toUpperCase();
+    
+    // Find existing variant by properties
+    const existingVariantIndex = product.variants.findIndex(existing => {
+      const props = existing.properties instanceof Map 
+        ? Object.fromEntries(existing.properties) 
+        : existing.properties || {};
+      return props.pipeType === v.pipeType && 
+             props.pipeDiameter === v.pipeDiameter && 
+             props.insulationThickness === v.insulationThickness;
+    });
+    
+    if (existingVariantIndex >= 0) {
+      // Merge supplier entry into existing variant
+      const existingVariant = product.variants[existingVariantIndex];
+      mergeVariantSupplierEntry(
+        existingVariant,
+        distributor._id,
+        manufacturer ? manufacturer._id : null,
+        {
+          listPrice: v.listPrice,
+          netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
+          discountPercent: discountPercent || null,
+          isPreferred: true
+        }
+      );
+      // Update pricing to reflect this distributor's pricing
+      existingVariant.pricing = {
+        listPrice: v.listPrice,
+        netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
+        discountPercent: discountPercent || null
+      };
+    } else {
+      // Create new variant with distributor supplier entry
+      newVariants.push({
+        name: variantName,
+        sku: variantSku,
         properties: new Map([
           ['pipeType', v.pipeType],
           ['pipeDiameter', v.pipeDiameter],
@@ -475,17 +792,25 @@ async function processPipeInsulationSheet(data, analysis, sheetInfo) {
           discountPercent: discountPercent || null
         },
         suppliers: [{
-          supplierId: supplier._id,
+          manufacturerId: manufacturer ? manufacturer._id : null,
+          distributorId: distributor._id,
           listPrice: v.listPrice,
           netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
           discountPercent: discountPercent || null,
           isPreferred: true
         }],
         isActive: true
-      }))
-    },
-    { upsert: true, new: true }
-  );
+      });
+    }
+  }
+  
+  // Add new variants to product
+  if (newVariants.length > 0) {
+    product.variants.push(...newVariants);
+  }
+  
+  // Save product with updated variants
+  await product.save();
 
   // Apply product-level discount if available
   if (discountPercent) {
@@ -510,16 +835,20 @@ async function processPipeInsulationSheet(data, analysis, sheetInfo) {
 async function processFittingMatrixSheet(data, analysis, sheetInfo) {
   const { groupCode, section, pageNumber, pageName, discountPercent } = sheetInfo;
   
-  // Find supplier (Crossroads C&I)
-  const supplier = await Company.findOneAndUpdate(
-    { name: 'Crossroads C&I', companyType: 'supplier' },
-    {
-      name: 'Crossroads C&I',
-      companyType: 'supplier',
-      isActive: true
-    },
-    { upsert: true, new: true }
-  );
+  // Get IMPRO distributor
+  const distributor = await getImportDistributor();
+  
+  // Extract manufacturer from sheet
+  const manufacturerName = extractManufacturerFromSheet(data);
+  const manufacturer = manufacturerName ? await getOrCreateManufacturer(manufacturerName) : null;
+  
+  // Create distributor-supplier relationship if manufacturer exists
+  if (manufacturer && distributor) {
+    await createDistributorSupplierRelationship(distributor._id, manufacturer._id);
+  }
+  
+  // For backward compatibility, supplier = distributor (who we buy from)
+  const supplier = distributor;
 
   // Determine product type based on page name
   let productTypeSlug = 'pipe-fittings';
@@ -608,29 +937,74 @@ async function processFittingMatrixSheet(data, analysis, sheetInfo) {
     throw new Error('No valid variants found in sheet');
   }
 
-  // Create or update product
+  // Create or update product using multi-distributor helper
   const productName = pageName || `Fiberglass ${fittingType} Fittings`;
-  const product = await Product.findOneAndUpdate(
-    { name: productName },
+  
+  const product = await findOrCreateProductByManufacturer(
     {
       name: productName,
+      description: `Fiberglass ${fittingType} pipe fittings${manufacturer ? ` by ${manufacturer.name}` : ''}`,
       productTypeId: productType._id,
-      description: `Fiberglass ${fittingType} pipe fittings from Crossroads C&I`,
       pricebookSection: section || '',
       pricebookPageNumber: pageNumber || '',
       pricebookPageName: pageName || '',
       pricebookGroupCode: groupCode || '',
-      suppliers: [{
-        supplierId: supplier._id,
+      unitOfMeasure: 'EA',
+      supplierEntry: {
         supplierPartNumber: '',
         listPrice: null, // Product-level pricing handled at variant level
         netPrice: null,
         discountPercent: discountPercent || null,
         isPreferred: true
-      }],
-      variants: variants.map(v => ({
-        sku: `FIB-${fittingType}-${v.pipeSize.replace(/[^0-9]/g, '')}-${v.wallThickness.replace(/[^0-9]/g, '')}`,
-        name: `${v.pipeSize} Pipe - ${v.wallThickness} Wall - ${fittingType}`,
+      }
+    },
+    manufacturer,
+    distributor
+  );
+  
+  // Process variants - merge supplier entries instead of replacing
+  const newVariants = [];
+  
+  for (const v of variants) {
+    const variantSku = `FIB-${fittingType}-${v.pipeSize.replace(/[^0-9]/g, '')}-${v.wallThickness.replace(/[^0-9]/g, '')}`;
+    const variantName = `${v.pipeSize} Pipe - ${v.wallThickness} Wall - ${fittingType}`;
+    
+    // Find existing variant by properties
+    const existingVariantIndex = product.variants.findIndex(existing => {
+      const props = existing.properties instanceof Map 
+        ? Object.fromEntries(existing.properties) 
+        : existing.properties || {};
+      return props.pipe_size === v.pipeSize && 
+             props.wall_thickness === v.wallThickness && 
+             props.fitting_type === v.fittingType;
+    });
+    
+    if (existingVariantIndex >= 0) {
+      // Merge supplier entry into existing variant
+      const existingVariant = product.variants[existingVariantIndex];
+      mergeVariantSupplierEntry(
+        existingVariant,
+        distributor._id,
+        manufacturer ? manufacturer._id : null,
+        {
+          supplierPartNumber: '',
+          listPrice: v.listPrice,
+          netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
+          discountPercent: discountPercent || null,
+          isPreferred: true
+        }
+      );
+      // Update pricing to reflect this distributor's pricing
+      existingVariant.pricing = {
+        listPrice: v.listPrice,
+        netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
+        discountPercent: discountPercent || null
+      };
+    } else {
+      // Create new variant with distributor supplier entry
+      newVariants.push({
+        sku: variantSku,
+        name: variantName,
         properties: new Map([
           ['pipe_size', v.pipeSize],
           ['wall_thickness', v.wallThickness],
@@ -642,7 +1016,8 @@ async function processFittingMatrixSheet(data, analysis, sheetInfo) {
           discountPercent: discountPercent || null
         },
         suppliers: [{
-          supplierId: supplier._id,
+          manufacturerId: manufacturer ? manufacturer._id : null,
+          distributorId: distributor._id,
           supplierPartNumber: '',
           listPrice: v.listPrice,
           netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
@@ -650,11 +1025,17 @@ async function processFittingMatrixSheet(data, analysis, sheetInfo) {
           isPreferred: true
         }],
         isActive: true
-      })),
-      isActive: true
-    },
-    { upsert: true, new: true }
-  );
+      });
+    }
+  }
+  
+  // Add new variants to product
+  if (newVariants.length > 0) {
+    product.variants.push(...newVariants);
+  }
+  
+  // Save product with updated variants
+  await product.save();
 
   // Apply product-level discount if available
   if (discountPercent) {
@@ -679,16 +1060,20 @@ async function processFittingMatrixSheet(data, analysis, sheetInfo) {
 async function processMineralWoolPipeSheet(data, analysis, sheetInfo) {
   const { groupCode, section, pageNumber, pageName, discountPercent } = sheetInfo;
   
-  // Find supplier (Crossroads C&I)
-  const supplier = await Company.findOneAndUpdate(
-    { name: 'Crossroads C&I', companyType: 'supplier' },
-    {
-      name: 'Crossroads C&I',
-      companyType: 'supplier',
-      isActive: true
-    },
-    { upsert: true, new: true }
-  );
+  // Get IMPRO distributor
+  const distributor = await getImportDistributor();
+  
+  // Extract manufacturer from sheet
+  const manufacturerName = extractManufacturerFromSheet(data);
+  const manufacturer = manufacturerName ? await getOrCreateManufacturer(manufacturerName) : null;
+  
+  // Create distributor-supplier relationship if manufacturer exists
+  if (manufacturer && distributor) {
+    await createDistributorSupplierRelationship(distributor._id, manufacturer._id);
+  }
+  
+  // For backward compatibility, supplier = distributor (who we buy from)
+  const supplier = distributor;
 
   // Get or create product type
   const productType = await ProductType.findOneAndUpdate(
@@ -870,7 +1255,7 @@ async function processMineralWoolPipeSheet(data, analysis, sheetInfo) {
   const product = await Product.findOneAndUpdate(
     {
       name: productName,
-      'suppliers.supplierId': supplier._id,
+      'suppliers.distributorId': supplier._id,
       productTypeId: productType._id,
       pricebookPageName: pageName,
       pricebookPageNumber: pageNumber,
@@ -879,10 +1264,13 @@ async function processMineralWoolPipeSheet(data, analysis, sheetInfo) {
     },
     {
       name: productName,
-      description: `Rockwool mineral wool pipe insulation from ${supplier.name}`,
+      description: `Rockwool mineral wool pipe insulation${manufacturer ? ` by ${manufacturer.name}` : ''}`,
       productTypeId: productType._id,
+      manufacturerId: manufacturer ? manufacturer._id : null,
+      distributorId: distributor._id,
       suppliers: [{
-        supplierId: supplier._id,
+        distributorId: distributor._id, // Distributor (who we buy from) - DISTRIBUTORS SET THE PRICE
+        manufacturerId: manufacturer ? manufacturer._id : null,
         supplierPartNumber: '',
         listPrice: null,
         netPrice: null,
@@ -909,7 +1297,8 @@ async function processMineralWoolPipeSheet(data, analysis, sheetInfo) {
             isPreferred: true
           },
           suppliers: [{
-            supplierId: supplier._id,
+            manufacturerId: manufacturer ? manufacturer._id : null,
+            distributorId: distributor._id,
             supplierPartNumber: '',
             listPrice: v.listPrice,
             netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
@@ -939,7 +1328,8 @@ async function processMineralWoolPipeSheet(data, analysis, sheetInfo) {
         isPreferred: true
       },
       suppliers: [{
-        supplierId: supplier._id,
+        distributorId: distributor._id, // Distributor (who we buy from) - DISTRIBUTORS SET THE PRICE
+        manufacturerId: manufacturer ? manufacturer._id : null,
         supplierPartNumber: '',
         listPrice: v.listPrice,
         netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
@@ -968,22 +1358,277 @@ async function processMineralWoolPipeSheet(data, analysis, sheetInfo) {
 }
 
 /**
+ * Process elastomeric pipe insulation format sheet
+ * Format: Interior Diameter + Copper Tube Size + thickness columns with List/NET/lf-ctn
+ */
+async function processElastomericPipeInsulationSheet(data, analysis, sheetInfo) {
+  const { groupCode, section, pageNumber, pageName, discountPercent } = sheetInfo;
+  
+  // Get IMPRO distributor
+  const distributor = await getImportDistributor();
+  
+  // Extract manufacturer from sheet
+  const manufacturerName = extractManufacturerFromSheet(data);
+  const manufacturer = manufacturerName ? await getOrCreateManufacturer(manufacturerName) : null;
+  
+  // Create distributor-supplier relationship if manufacturer exists
+  if (manufacturer && distributor) {
+    await createDistributorSupplierRelationship(distributor._id, manufacturer._id);
+  }
+  
+  // For backward compatibility, supplier = distributor (who we buy from)
+  const supplier = distributor;
+
+  // Get or create product type
+  const productType = await ProductType.findOneAndUpdate(
+    { slug: 'elastomeric-pipe-insulation' },
+    {
+      name: 'Elastomeric Pipe Insulation',
+      slug: 'elastomeric-pipe-insulation',
+      description: 'Elastomeric pipe insulation',
+      properties: [
+        { key: 'interiorDiameter', label: 'Interior Diameter', type: 'string' },
+        { key: 'copperTubeSize', label: 'Copper Tube Size', type: 'string' },
+        { key: 'insulationThickness', label: 'Insulation Thickness', type: 'string' }
+      ],
+      variantSettings: {
+        variantProperties: ['interiorDiameter', 'copperTubeSize', 'insulationThickness']
+      }
+    },
+    { upsert: true, new: true }
+  );
+
+  const headerRow = data[analysis.headerRow];
+  const codeRow = data[analysis.headerRow + 1]; // Codes row (0038, 0048, etc.)
+  const subHeaderRow = data[analysis.headerRow + 2]; // "List", "NET", "lf/ctn" row
+  const dataRows = data.slice(analysis.dataStartRow);
+
+  // Find column indices
+  const interiorDiameterCol = headerRow.findIndex(h => String(h).toLowerCase().includes('interior diameter'));
+  const copperTubeSizeCol = headerRow.findIndex(h => String(h).toLowerCase().includes('copper tube size'));
+  
+  // Find code column (usually empty in header row but has codes in codeRow)
+  let codeCol = -1;
+  if (codeRow) {
+    for (let i = 0; i < codeRow.length; i++) {
+      const codeVal = String(codeRow[i] || '').trim();
+      if (codeVal && codeVal.match(/^\d{4}$/)) {
+        codeCol = i;
+        break;
+      }
+    }
+  }
+
+  // Parse thickness columns from header row
+  // Structure: thickness header, empty, empty, then next thickness header
+  // Sub-header row has: List, NET, lf/ctn repeated for each thickness
+  const thicknessColumns = [];
+  
+  for (let col = 0; col < headerRow.length; col++) {
+    const thicknessHeader = String(headerRow[col] || '').trim();
+    
+    // Check if this looks like a thickness header (e.g., "3/8''", "1/2''", "1\"")
+    const thicknessMatch = thicknessHeader.match(/(\d+(?:\/\d+)?(?:-\d+\/\d+)?)\s*["']/);
+    if (thicknessMatch) {
+      const thickness = thicknessMatch[1] + '"';
+      
+      // Find List, NET, lf/ctn columns in sub-header row starting from this column
+      let listCol = -1, netCol = -1, lfCtnCol = -1;
+      
+      // Look for "List", "NET", "lf/ctn" in sub-header row starting from col
+      for (let i = col; i < Math.min(col + 5, subHeaderRow.length); i++) {
+        const subHeader = String(subHeaderRow[i] || '').toLowerCase().trim();
+        if (subHeader === 'list' && listCol === -1) {
+          listCol = i;
+        } else if (subHeader === 'net' && netCol === -1 && listCol !== -1) {
+          netCol = i;
+        } else if ((subHeader.includes('lf') || subHeader.includes('ctn')) && lfCtnCol === -1 && netCol !== -1) {
+          lfCtnCol = i;
+          break; // Found all three columns for this thickness
+        }
+      }
+      
+      if (listCol !== -1 && netCol !== -1 && lfCtnCol !== -1) {
+        thicknessColumns.push({
+          thickness: thickness,
+          listCol: listCol,
+          netCol: netCol,
+          lfCtnCol: lfCtnCol
+        });
+      }
+    }
+  }
+
+  if (thicknessColumns.length === 0) {
+    throw new Error('No thickness columns found in sheet');
+  }
+
+  const variants = [];
+  
+  // Process each data row
+  for (const row of dataRows) {
+    if (!row || row.length < Math.max(interiorDiameterCol, copperTubeSizeCol) + 1) continue;
+    
+    const interiorDiameter = String(row[interiorDiameterCol] || '').trim();
+    const copperTubeSize = String(row[copperTubeSizeCol] || '').trim();
+    const code = codeCol !== -1 ? String(row[codeCol] || '').trim() : '';
+    
+    if (!interiorDiameter || interiorDiameter === '-' || interiorDiameter === '') continue;
+    
+    // Process each thickness
+    for (const thicknessCol of thicknessColumns) {
+      const listPriceStr = thicknessCol.listCol !== -1 ? String(row[thicknessCol.listCol] || '').trim() : '';
+      
+      // Skip if price is #N/A or empty
+      if (listPriceStr === '#N/A' || listPriceStr === '' || listPriceStr === '-') continue;
+      
+      // Try to parse price (might be a formula result)
+      const cleanPrice = listPriceStr.replace(/\$/g, '').replace(/,/g, '').replace(/#N\/A/gi, '').trim();
+      const listPrice = parseFloat(cleanPrice);
+      
+      if (isNaN(listPrice) || listPrice <= 0) continue;
+      
+      // Get NET price if available
+      let netPrice = null;
+      if (thicknessCol.netCol !== -1 && row[thicknessCol.netCol]) {
+        const netPriceStr = String(row[thicknessCol.netCol] || '').trim();
+        if (netPriceStr !== '#N/A' && netPriceStr !== '' && netPriceStr !== '-') {
+          const cleanNet = netPriceStr.replace(/\$/g, '').replace(/,/g, '').replace(/#N\/A/gi, '').trim();
+          const parsedNet = parseFloat(cleanNet);
+          if (!isNaN(parsedNet) && parsedNet > 0) {
+            netPrice = parsedNet;
+          }
+        }
+      }
+      
+      // Get lf/ctn if available
+      let lfPerCtn = null;
+      if (thicknessCol.lfCtnCol !== -1 && row[thicknessCol.lfCtnCol]) {
+        const lfCtnStr = String(row[thicknessCol.lfCtnCol] || '').trim();
+        if (lfCtnStr !== '' && lfCtnStr !== '-') {
+          const cleanLf = lfCtnStr.replace(/,/g, '').trim();
+          const parsedLf = parseFloat(cleanLf);
+          if (!isNaN(parsedLf) && parsedLf > 0) {
+            lfPerCtn = parsedLf;
+          }
+        }
+      }
+      
+      // Calculate discount if NET price is available but discountPercent not provided
+      let finalDiscountPercent = discountPercent;
+      if (!finalDiscountPercent && netPrice && listPrice > 0) {
+        finalDiscountPercent = ((listPrice - netPrice) / listPrice) * 100;
+      }
+      
+      variants.push({
+        interiorDiameter: interiorDiameter,
+        copperTubeSize: copperTubeSize || '',
+        insulationThickness: thicknessCol.thickness,
+        code: code,
+        listPrice: listPrice,
+        netPrice: netPrice || (finalDiscountPercent ? listPrice * (1 - finalDiscountPercent / 100) : null),
+        discountPercent: finalDiscountPercent,
+        lfPerCtn: lfPerCtn
+      });
+    }
+  }
+
+  if (variants.length === 0) {
+    throw new Error('No valid variants found in sheet');
+  }
+
+  // Create or update product
+  const productName = pageName || 'Elastomeric Pipe Insulation';
+  const product = await Product.findOneAndUpdate(
+    { name: productName },
+    {
+      name: productName,
+      productTypeId: productType._id,
+      description: `${productName}${manufacturer ? ` from ${manufacturer.name}` : ''}`,
+      pricebookSection: section || '',
+      pricebookPageNumber: pageNumber || '',
+      pricebookPageName: pageName || '',
+      pricebookGroupCode: groupCode || '',
+      manufacturerId: manufacturer ? manufacturer._id : null,
+      distributorId: distributor._id,
+      suppliers: [{
+        distributorId: distributor._id, // Distributor (who we buy from) - DISTRIBUTORS SET THE PRICE
+        manufacturerId: manufacturer ? manufacturer._id : null,
+        supplierPartNumber: '',
+        listPrice: null,
+        netPrice: null,
+        discountPercent: discountPercent || null,
+        isPreferred: true
+      }],
+      variants: variants.map(v => ({
+        sku: `ELT-${v.code || v.interiorDiameter.replace(/[^0-9]/g, '')}-${v.insulationThickness.replace(/[^0-9]/g, '')}`,
+        name: `${v.interiorDiameter} Interior - ${v.copperTubeSize || 'N/A'} CTS - ${v.insulationThickness} Thickness`,
+        properties: new Map([
+          ['interior_diameter', v.interiorDiameter],
+          ['copper_tube_size', v.copperTubeSize || ''],
+          ['insulation_thickness', v.insulationThickness],
+          ...(v.code ? [['code', v.code]] : []),
+          ...(v.lfPerCtn ? [['lf_per_ctn', v.lfPerCtn]] : [])
+        ]),
+        pricing: {
+          listPrice: v.listPrice,
+          netPrice: v.netPrice,
+          discountPercent: v.discountPercent || null
+        },
+        suppliers: [{
+          manufacturerId: manufacturer ? manufacturer._id : null,
+          distributorId: distributor._id,
+          supplierPartNumber: v.code || '',
+          listPrice: v.listPrice,
+          netPrice: v.netPrice,
+          discountPercent: v.discountPercent || null,
+          isPreferred: true
+        }],
+        isActive: true
+      })),
+      isActive: true
+    },
+    { upsert: true, new: true }
+  );
+
+  // Apply product-level discount if available
+  if (discountPercent) {
+    product.productDiscount = {
+      discountPercent: discountPercent,
+      effectiveDate: new Date()
+    };
+    await product.save();
+  }
+
+  return {
+    productId: product._id,
+    productName: product.name,
+    variantsCreated: variants.length,
+    format: 'elastomeric-pipe-insulation'
+  };
+}
+
+/**
  * Process duct liner format sheet (thickness × dimensions table)
  * Note: This sheet may contain multiple products (RC and PM)
  */
 async function processDuctLinerSheet(data, analysis, sheetInfo) {
   const { groupCode, section, pageNumber, pageName, discountPercent } = sheetInfo;
   
-  // Find supplier (Crossroads C&I)
-  const supplier = await Company.findOneAndUpdate(
-    { name: 'Crossroads C&I', companyType: 'supplier' },
-    {
-      name: 'Crossroads C&I',
-      companyType: 'supplier',
-      isActive: true
-    },
-    { upsert: true, new: true }
-  );
+  // Get IMPRO distributor
+  const distributor = await getImportDistributor();
+  
+  // Extract manufacturer from sheet
+  const manufacturerName = extractManufacturerFromSheet(data);
+  const manufacturer = manufacturerName ? await getOrCreateManufacturer(manufacturerName) : null;
+  
+  // Create distributor-supplier relationship if manufacturer exists
+  if (manufacturer && distributor) {
+    await createDistributorSupplierRelationship(distributor._id, manufacturer._id);
+  }
+  
+  // For backward compatibility, supplier = distributor (who we buy from)
+  const supplier = distributor;
 
   // Get or create product type
   const productType = await ProductType.findOneAndUpdate(
@@ -1054,7 +1699,7 @@ async function processDuctLinerSheet(data, analysis, sheetInfo) {
     if (rcHeaderRow !== -1) {
       const rcResult = await processDuctLinerProduct(
         data, rcHeaderRow, 'JM LINACOUSTIC RC', 'rc', 
-        supplier, productType, sheetInfo, discountPercent
+        supplier, productType, sheetInfo, discountPercent, null, distributor, manufacturer
       );
       results.push(rcResult);
     }
@@ -1074,7 +1719,7 @@ async function processDuctLinerSheet(data, analysis, sheetInfo) {
     if (pmHeaderRow !== -1) {
       const pmResult = await processDuctLinerProduct(
         data, pmHeaderRow, 'JM DUCT LINER PM', 'pm',
-        supplier, productType, sheetInfo, discountPercent
+        supplier, productType, sheetInfo, discountPercent, null, distributor, manufacturer
       );
       results.push(pmResult);
     }
@@ -1138,7 +1783,7 @@ async function processDuctLinerSheet(data, analysis, sheetInfo) {
       if (headerRow !== -1) {
         const result = await processDuctLinerProduct(
           data, headerRow, product.name, product.type,
-          supplier, productType, sheetInfo, discountPercent, sectionStart
+          supplier, productType, sheetInfo, discountPercent, sectionStart, distributor, manufacturer
         );
         if (result && result.variantsCreated > 0) {
           results.push(result);
@@ -1164,16 +1809,20 @@ async function processDuctLinerSheet(data, analysis, sheetInfo) {
 async function processBoardSheet(data, analysis, sheetInfo) {
   const { groupCode, section, pageNumber, pageName, discountPercent } = sheetInfo;
   
-  // Find supplier (Crossroads C&I)
-  const supplier = await Company.findOneAndUpdate(
-    { name: 'Crossroads C&I', companyType: 'supplier' },
-    {
-      name: 'Crossroads C&I',
-      companyType: 'supplier',
-      isActive: true
-    },
-    { upsert: true, new: true }
-  );
+  // Get IMPRO distributor
+  const distributor = await getImportDistributor();
+  
+  // Extract manufacturer from sheet
+  const manufacturerName = extractManufacturerFromSheet(data);
+  const manufacturer = manufacturerName ? await getOrCreateManufacturer(manufacturerName) : null;
+  
+  // Create distributor-supplier relationship if manufacturer exists
+  if (manufacturer && distributor) {
+    await createDistributorSupplierRelationship(distributor._id, manufacturer._id);
+  }
+  
+  // For backward compatibility, supplier = distributor (who we buy from)
+  const supplier = distributor;
 
   // Get or create product type
   const productType = await ProductType.findOneAndUpdate(
@@ -1232,7 +1881,7 @@ async function processBoardSheet(data, analysis, sheetInfo) {
       // Empty row - save current product if we have variants
       if (currentProduct && variants.length > 0) {
         const result = await createBoardProduct(
-          currentProduct, variants, supplier, productType, sheetInfo, discountPercent
+          currentProduct, variants, supplier, productType, sheetInfo, discountPercent, distributor, manufacturer
         );
         results.push(result);
         variants.length = 0; // Clear for next product
@@ -1252,7 +1901,7 @@ async function processBoardSheet(data, analysis, sheetInfo) {
       // Footer - save current product and break
       if (currentProduct && variants.length > 0) {
         const result = await createBoardProduct(
-          currentProduct, variants, supplier, productType, sheetInfo, discountPercent
+          currentProduct, variants, supplier, productType, sheetInfo, discountPercent, distributor, manufacturer
         );
         results.push(result);
       }
@@ -1304,7 +1953,7 @@ async function processBoardSheet(data, analysis, sheetInfo) {
       // Save previous product if exists
       if (currentProduct && variants.length > 0) {
         const result = await createBoardProduct(
-          currentProduct, variants, supplier, productType, sheetInfo, discountPercent
+          currentProduct, variants, supplier, productType, sheetInfo, discountPercent, distributor, manufacturer
         );
         results.push(result);
         variants.length = 0;
@@ -1318,7 +1967,7 @@ async function processBoardSheet(data, analysis, sheetInfo) {
       // Save previous product if exists
       if (currentProduct && variants.length > 0) {
         const result = await createBoardProduct(
-          currentProduct, variants, supplier, productType, sheetInfo, discountPercent
+          currentProduct, variants, supplier, productType, sheetInfo, discountPercent, distributor, manufacturer
         );
         results.push(result);
         variants.length = 0;
@@ -1436,8 +2085,11 @@ function parseBoardVariant(row, thicknessCol, sqFtCol, pricePerSqFtCol, pricePer
 /**
  * Create a board product with variants
  */
-async function createBoardProduct(product, variants, supplier, productType, sheetInfo, discountPercent) {
+async function createBoardProduct(product, variants, supplier, productType, sheetInfo, discountPercent, distributor = null, manufacturer = null) {
   const { groupCode, section, pageNumber, pageName } = sheetInfo;
+  
+  // Use distributor if provided, otherwise fall back to supplier
+  const dist = distributor || supplier;
   
   const productName = product.name.replace(/\n/g, ' ').trim();
   
@@ -1446,13 +2098,16 @@ async function createBoardProduct(product, variants, supplier, productType, shee
     {
       name: productName,
       productTypeId: productType._id,
-      description: `${productName} fiberglass board from Crossroads C&I`,
+      description: `${productName} fiberglass board${manufacturer ? ` by ${manufacturer.name}` : ''}`,
       pricebookSection: section || '',
       pricebookPageNumber: pageNumber || '',
       pricebookPageName: pageName || '',
       pricebookGroupCode: groupCode || '',
+      manufacturerId: manufacturer ? manufacturer._id : null,
+      distributorId: dist._id,
       suppliers: [{
-        supplierId: supplier._id,
+        manufacturerId: manufacturer ? manufacturer._id : null,
+        distributorId: dist._id,
         supplierPartNumber: product.productCode || '',
         listPrice: null,
         netPrice: null,
@@ -1474,7 +2129,9 @@ async function createBoardProduct(product, variants, supplier, productType, shee
           discountPercent: discountPercent || null
         },
         suppliers: [{
-          supplierId: supplier._id,
+          supplierId: dist._id, // Distributor (who we buy from)
+          manufacturerId: manufacturer ? manufacturer._id : null,
+          distributorId: dist._id,
           supplierPartNumber: product.productCode || '',
           listPrice: v.listPrice,
           netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
@@ -1507,7 +2164,7 @@ async function createBoardProduct(product, variants, supplier, productType, shee
 /**
  * Process a single duct liner product from the sheet
  */
-async function processDuctLinerProduct(data, headerRowIndex, productName, productTypeCode, supplier, productType, sheetInfo, discountPercent, productNameRowIndex = null) {
+async function processDuctLinerProduct(data, headerRowIndex, productName, productTypeCode, supplier, productType, sheetInfo, discountPercent, productNameRowIndex = null, distributor = null, manufacturer = null) {
   const { groupCode, section, pageNumber, pageName } = sheetInfo;
   
   const headerRow = data[headerRowIndex];
@@ -1645,19 +2302,25 @@ async function processDuctLinerProduct(data, headerRowIndex, productName, produc
     return null;
   }
 
+  // Use distributor if provided, otherwise fall back to supplier
+  const dist = distributor || supplier;
+  
   // Create or update product
   const product = await Product.findOneAndUpdate(
     { name: productName },
     {
       name: productName,
       productTypeId: productType._id,
-      description: `${productName} duct liner from Crossroads C&I`,
+      description: `${productName} duct liner${manufacturer ? ` by ${manufacturer.name}` : ''}`,
       pricebookSection: section || '',
       pricebookPageNumber: pageNumber || '',
       pricebookPageName: pageName || '',
       pricebookGroupCode: groupCode || '',
+      manufacturerId: manufacturer ? manufacturer._id : null,
+      distributorId: dist._id,
       suppliers: [{
-        supplierId: supplier._id,
+        manufacturerId: manufacturer ? manufacturer._id : null,
+        distributorId: dist._id,
         supplierPartNumber: '',
         listPrice: null,
         netPrice: null,
@@ -1679,7 +2342,9 @@ async function processDuctLinerProduct(data, headerRowIndex, productName, produc
           discountPercent: discountPercent || null
         },
         suppliers: [{
-          supplierId: supplier._id,
+          supplierId: dist._id, // Distributor (who we buy from)
+          manufacturerId: manufacturer ? manufacturer._id : null,
+          distributorId: dist._id,
           supplierPartNumber: '',
           listPrice: v.listPrice,
           netPrice: discountPercent ? v.listPrice * (1 - discountPercent / 100) : null,
@@ -1794,6 +2459,9 @@ async function importSheet(sheetName, gid, sheetInfo = {}, providedData = null) 
         break;
       case 'mineral-wool-pipe':
         result = await processMineralWoolPipeSheet(sheetData, analysis, sheetInfo);
+        break;
+      case 'elastomeric-pipe-insulation':
+        result = await processElastomericPipeInsulationSheet(sheetData, analysis, sheetInfo);
         break;
       default:
         throw new Error(`Unsupported format: ${analysis.format}. Please implement handler for this format.`);
